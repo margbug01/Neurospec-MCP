@@ -1,0 +1,103 @@
+/* 语义化 CSS 变量 - 由主题系统动态设置 */
+:root {
+  /* 使用中性的初始值，等待主题系统设置正确的值 */
+  --color-surface: #f5f5f5;
+  --color-surface-50: #f9f9f9;
+  --color-surface-100: #f0f0f0;
+  --color-surface-200: #e0e0e0;
+  --color-surface-300: #d0d0d0;
+  --color-surface-400: #a0a0a0;
+  --color-surface-500: #808080;
+  --color-surface-600: #606060;
+  --color-surface-700: #404040;
+  --color-surface-800: #303030;
+  --color-surface-900: #202020;
+  --color-surface-950: #101010;
+  --color-on-surface: #333333;
+
+  /* 字体变量 - 由字体管理器动态设置 */
+  --font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --body-font-family: var(--font-family);
+  --font-size-scale: 1.0;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 0.875rem;
+  --font-size-lg: 1rem;
+  --font-size-xl: 1.125rem;
+  --font-size-2xl: 1.25rem;
+  --font-size-3xl: 1.5rem;
+
+  /* 基础字体设置 */
+  --font-family-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-family-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+/* UnoCSS 自定义样式 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 全局样式重置 */
+* {
+  box-sizing: border-box;
+  /* 全局消除默认 Outline */
+  outline: none;
+}
+
+/* 强制移除按钮和输入框的默认边框和轮廓 */
+button, input, textarea, select {
+  outline: none !important;
+  border: none;
+}
+
+button:focus, button:active, button:focus-visible,
+input:focus, input:active, input:focus-visible,
+textarea:focus, textarea:active, textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none;
+}
+
+/* 移除 Firefox 按钮内的虚线框 */
+button::-moz-focus-inner {
+  border: 0;
+}
+
+html {
+  background-color: var(--body-color, #f5f5f5);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  background-color: var(--body-color, #f5f5f5);
+  color: var(--text-color, #333333);
+  min-height: 100vh;
+}
+
+/* 字体大小工具类 */
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-base { font-size: var(--font-size-base); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-2xl { font-size: var(--font-size-2xl); }
+.text-3xl { font-size: var(--font-size-3xl); }
+
+/* 确保引用块的边框在所有主题下都显示 */
+.markdown-content blockquote {
+  border-left: 4px solid #14b8a6 !important;
+  padding-left: 1rem !important;
+  margin-left: 0 !important;
+  font-style: italic !important;
+}
