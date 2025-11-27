@@ -1,7 +1,54 @@
 use anyhow::Result;
 use rmcp::{ErrorData as McpError, model::Content};
+use std::fs;
+use std::path::PathBuf;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use crate::mcp::types::{McpResponse, McpResponseContent};
+
+/// 获取临时图片保存目录
+fn get_temp_image_dir() -> PathBuf {
+    let temp_dir = std::env::temp_dir().join("neurospec").join("images");
+    let _ = fs::create_dir_all(&temp_dir);
+    temp_dir
+}
+
+/// 保存 Base64 图片到临时文件，返回文件路径
+fn save_image_to_temp(base64_data: &str, media_type: &str, index: usize) -> Option<PathBuf> {
+    let extension = match media_type {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        _ => "png",
+    };
+    
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    
+    let filename = format!("interact_{}_{}.{}", timestamp, index, extension);
+    let file_path = get_temp_image_dir().join(&filename);
+    
+    // 解码 Base64 并保存
+    match BASE64.decode(base64_data) {
+        Ok(image_bytes) => {
+            if fs::write(&file_path, &image_bytes).is_ok() {
+                log::info!("Saved image to: {}", file_path.display());
+                Some(file_path)
+            } else {
+                log::warn!("Failed to write image file");
+                None
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to decode base64 image: {}", e);
+            None
+        }
+    }
+}
 
 /// 解析 MCP 响应内容
 ///
@@ -172,12 +219,27 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
     let mut all_text_parts = text_parts;
     all_text_parts.extend(image_info_parts);
 
-    // 5. 添加兼容性说明
+    // 5. 保存图片到临时文件并添加路径信息
     if !response.images.is_empty() {
-        all_text_parts.push(format!(
-            "💡 注意：用户提供了 {} 张图片。如果 AI 助手无法显示图片，图片数据已包含在上述 Base64 信息中。",
-            response.images.len()
-        ));
+        let mut saved_paths = Vec::new();
+        for (index, image) in response.images.iter().enumerate() {
+            if let Some(path) = save_image_to_temp(&image.data, &image.media_type, index + 1) {
+                saved_paths.push(format!("📁 图片 {}: {}", index + 1, path.display()));
+            }
+        }
+        
+        if !saved_paths.is_empty() {
+            all_text_parts.push(format!(
+                "⚠️ **用户上传了 {} 张图片，请立即使用 read_file 工具查看！**\n{}",
+                saved_paths.len(),
+                saved_paths.join("\n")
+            ));
+        } else {
+            all_text_parts.push(format!(
+                "💡 注意：用户提供了 {} 张图片。如果 AI 助手无法显示图片，图片数据已包含在上述 Base64 信息中。",
+                response.images.len()
+            ));
+        }
     }
 
     // 6. 将文本内容添加到结果中（图片后面）

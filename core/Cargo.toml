@@ -80,6 +80,7 @@ zstd = "=0.12.4"
 zstd-safe = "=6.0.6"
 tantivy = { version = "0.21", default-features = false, features = [ "default" ] }
 rusqlite = { version = "0.31", features = [ "bundled" ] }
+base64 = "0.22.1"
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

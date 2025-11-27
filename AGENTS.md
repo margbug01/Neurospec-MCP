@@ -29,6 +29,7 @@
    summary: 一句话描述本次修改
    [/CHANGE_REPORT]
    ```
+6. **图片自动查看：** 当 `interact` 返回的响应中包含图片路径时（格式：`📁 图片 N: /path/to/image`），**必须立即**使用 `read_file` 工具查看该图片，理解用户提供的视觉信息。
 
 # Core Workflow (核心工作流)
 
