@@ -4,6 +4,11 @@
 
 > **AI-Powered Development Assistant - Interactive Dialogue, Memory Management & Code Search**
 
+[![Release](https://img.shields.io/github/v/release/margbug01/Neurospec-MCP)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+[![Download](https://img.shields.io/github/downloads/margbug01/Neurospec-MCP/total)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+
+**[⬇️ Download Latest Release](https://github.com/margbug01/Neurospec-MCP/releases/latest)**
+
 <p align="center">
   <img src="icon-new.png" alt="NeuroSpec Logo" width="128" height="128">
 </p>

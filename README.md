@@ -4,6 +4,11 @@
 
 > **AI 驱动的开发助手 - 智能交互、记忆管理与代码搜索**
 
+[![Release](https://img.shields.io/github/v/release/margbug01/Neurospec-MCP)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+[![Download](https://img.shields.io/github/downloads/margbug01/Neurospec-MCP/total)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+
+**[⬇️ 下载最新版本](https://github.com/margbug01/Neurospec-MCP/releases/latest)**
+
 <p align="center">
   <img src="icon-new.png" alt="NeuroSpec Logo" width="128" height="128">
 </p>
