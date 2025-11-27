@@ -1,5 +1,7 @@
 # NeuroSpec
 
+**中文** | [English](README_EN.md)
+
 > **AI 驱动的开发助手 - 智能交互、记忆管理与代码搜索**
 
 <p align="center">
