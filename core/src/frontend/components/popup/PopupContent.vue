@@ -441,11 +441,11 @@ onUpdated(() => {
           prose-h3:text-sm prose-h3:my-1
           prose-p:text-gray-700 prose-p:leading-relaxed prose-p:my-2
           prose-li:text-gray-700 prose-li:my-0.5
-          prose-table:text-sm prose-table:my-3 prose-table:w-full prose-table:border-2 prose-table:border-gray-800
+          prose-table:text-sm prose-table:my-3 prose-table:w-full prose-table:border-2 prose-table:border-gray-800 prose-table:border-collapse prose-table:table-fixed
           prose-thead:border-b-2 prose-thead:border-gray-800 prose-thead:bg-gray-100
-          prose-th:text-gray-900 prose-th:font-bold prose-th:py-2 prose-th:px-3 prose-th:text-left
+          prose-th:text-gray-900 prose-th:font-bold prose-th:py-2 prose-th:px-3 prose-th:text-left prose-th:align-top prose-th:break-words
           prose-tr:border-b prose-tr:border-gray-300
-          prose-td:text-gray-700 prose-td:py-2 prose-td:px-3
+          prose-td:text-gray-700 prose-td:py-2 prose-td:px-3 prose-td:align-top prose-td:break-words
           prose-pre:bg-[#1a1c20] prose-pre:text-green-400 prose-pre:border-2 prose-pre:border-gray-800 prose-pre:rounded-none prose-pre:my-3
           prose-code:bg-gray-200 prose-code:text-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded-none prose-code:font-bold prose-code:before:content-none prose-code:after:content-none
           prose-blockquote:border-l-4 prose-blockquote:border-gray-800 prose-blockquote:pl-3 prose-blockquote:my-3 prose-blockquote:text-gray-600 prose-blockquote:bg-gray-50"
@@ -791,5 +791,53 @@ onUpdated(() => {
 
 :deep(.system-context-body li::marker) {
   color: #9ca3af;
+}
+
+/* 表格样式增强 - 修复重叠问题 */
+:deep(.markdown-content table) {
+  table-layout: auto !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1rem 0 !important;
+}
+
+:deep(.markdown-content thead) {
+  background-color: #f3f4f6 !important;
+}
+
+:deep(.markdown-content th),
+:deep(.markdown-content td) {
+  vertical-align: top !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  padding: 0.5rem 0.75rem !important;
+  border: 1px solid #d1d5db !important;
+  min-width: 80px !important;
+}
+
+:deep(.markdown-content th) {
+  font-weight: 700 !important;
+  background-color: #f3f4f6 !important;
+}
+
+:deep(.markdown-content tr) {
+  border-bottom: 1px solid #d1d5db !important;
+}
+
+:deep(.markdown-content tbody tr:hover) {
+  background-color: #f9fafb !important;
+}
+
+/* 表格内的列表样式 */
+:deep(.markdown-content td ol),
+:deep(.markdown-content td ul) {
+  margin: 0.25rem 0 !important;
+  padding-left: 1.25rem !important;
+}
+
+:deep(.markdown-content td li) {
+  margin: 0.125rem 0 !important;
+  font-size: 0.8125rem !important;
 }
 </style>

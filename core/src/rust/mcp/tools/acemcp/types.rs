@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+#[schemars(rename_all = "lowercase")]
 pub enum SearchMode {
-    #[serde(rename = "text")]
     Text,
-    #[serde(rename = "symbol")]
     Symbol,
-    #[serde(rename = "structure")]
     Structure,
 }
 
