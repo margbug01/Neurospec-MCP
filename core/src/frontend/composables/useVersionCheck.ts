@@ -111,7 +111,7 @@ async function checkLatestVersion(): Promise<VersionInfo | null> {
   try {
     isChecking.value = true
 
-    const response = await fetch('https://api.github.com/repos/neurospec/neurospec/releases/latest', {
+    const response = await fetch('https://api.github.com/repos/margbug01/Neurospec-MCP/releases/latest', {
       headers: {
         Accept: 'application/vnd.github.v3+json',
       },
@@ -235,7 +235,7 @@ async function safeOpenUrl(url: string): Promise<void> {
 
 // 打开下载页面
 async function openDownloadPage(): Promise<void> {
-  await safeOpenUrl('https://github.com/neurospec/neurospec/releases/latest')
+  await safeOpenUrl('https://github.com/margbug01/Neurospec-MCP/releases/latest')
 }
 
 // 打开发布页面
