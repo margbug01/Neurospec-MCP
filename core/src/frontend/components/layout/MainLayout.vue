@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, withDefaults } from 'vue'
 import AgentsTab from '../tabs/AgentsTab.vue'
 import HistoryTab from '../tabs/HistoryTab.vue'
 import IntroTab from '../tabs/IntroTab.vue'
@@ -15,15 +15,19 @@ interface Props {
   windowHeight: number
   fixedWindowSize: boolean
   initialTab?: string
+  fromPopup?: boolean
 }
 
 interface Emits {
   toggleAlwaysOnTop: []
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
   configReloaded: []
+  closeToPopup: []
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  fromPopup: false
+})
 const emit = defineEmits<Emits>()
 
 function handleConfigReloaded() {
@@ -57,15 +61,17 @@ const activeTab = ref(props.initialTab || 'intro')
                   : activeTab === 'prompts' ? PromptsTab
                     : activeTab === 'agents' ? AgentsTab
                       : SettingsTab"
-          :current-theme="currentTheme"
-          :always-on-top="alwaysOnTop"
-          :window-width="windowWidth"
-          :window-height="windowHeight"
-          :fixed-window-size="fixedWindowSize"
-          @toggle-always-on-top="$emit('toggleAlwaysOnTop')"
-          @update-window-size="$emit('updateWindowSize', $event)"
+          :current-theme="props.currentTheme"
+          :always-on-top="props.alwaysOnTop"
+          :window-width="props.windowWidth"
+          :window-height="props.windowHeight"
+          :fixed-window-size="props.fixedWindowSize"
+          :from-popup="props.fromPopup"
+          @toggle-always-on-top="emit('toggleAlwaysOnTop')"
+          @update-window-size="emit('updateWindowSize', $event)"
           @config-reloaded="handleConfigReloaded"
           @navigate-to="activeTab = $event"
+          @close-to-popup="emit('closeToPopup')"
         />
       </div>
     </div>

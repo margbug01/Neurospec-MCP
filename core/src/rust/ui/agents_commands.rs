@@ -15,6 +15,22 @@ fn get_cache() -> &'static Mutex<Option<String>> {
     PROJECT_PATH_CACHE.get_or_init(|| Mutex::new(None))
 }
 
+/// 更新项目路径缓存（供 MCP 调用时使用）
+pub fn update_project_path_cache(path: &str) {
+    let path_buf = PathBuf::from(path);
+    if path_buf.exists() {
+        if let Some(root) = find_git_root(&path_buf) {
+            let root_str = root.to_string_lossy().to_string();
+            if let Ok(mut cache) = get_cache().lock() {
+                *cache = Some(root_str.clone());
+            }
+            // 同时保存到配置文件
+            let _ = save_project_path_config(&root_str);
+            log::info!("项目路径缓存已更新: {}", root_str);
+        }
+    }
+}
+
 /// 检测项目响应
 #[derive(Serialize)]
 pub struct DetectProjectResponse {

@@ -48,6 +48,7 @@ const { versionInfo, showUpdateModal } = useVersionCheck()
 // 弹窗中的设置显示控制
 const showPopupSettings = ref(false)
 const popupSettingsTab = ref<string | undefined>(undefined)
+const isFromPopup = ref(false)
 
 // 初始化 Toast 实例
 const toast = useToast()
@@ -58,13 +59,22 @@ const { handleExitShortcut } = useKeyboard()
 // 切换弹窗设置显示
 function togglePopupSettings() {
   popupSettingsTab.value = undefined
+  isFromPopup.value = true
   showPopupSettings.value = !showPopupSettings.value
 }
 
 // 打开历史记录 Tab
 function openHistoryTab() {
   popupSettingsTab.value = 'history'
+  isFromPopup.value = true
   showPopupSettings.value = true
+}
+
+// 关闭设置并返回弹窗
+function closeSettingsToPopup() {
+  showPopupSettings.value = false
+  isFromPopup.value = false
+  popupSettingsTab.value = undefined
 }
 
 // 监听 MCP 请求变化，当有新请求时重置设置页面状态
@@ -104,8 +114,10 @@ onUnmounted(() => {
         v-if="showPopupSettings"
         :app-config="props.appConfig"
         :initial-tab="popupSettingsTab"
+        :from-popup="isFromPopup"
         @toggle-always-on-top="$emit('toggleAlwaysOnTop')"
         @update-window-size="$emit('updateWindowSize', $event)"
+        @close-to-popup="closeSettingsToPopup"
       />
       <!-- 弹窗内容 -->
       <McpPopup

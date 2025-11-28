@@ -18,28 +18,34 @@ interface AppConfig {
 interface Props {
   appConfig: AppConfig
   initialTab?: string
+  fromPopup?: boolean
 }
 
 interface Emits {
   toggleAlwaysOnTop: []
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
   configReloaded: []
+  closeToPopup: []
 }
 
-defineProps<Props>()
-defineEmits<Emits>()
+const props = withDefaults(defineProps<Props>(), {
+  fromPopup: false
+})
+const emit = defineEmits<Emits>()
 </script>
 
 <template>
   <MainLayout
-    :current-theme="appConfig.theme"
-    :always-on-top="appConfig.window.alwaysOnTop"
-    :window-width="appConfig.window.width"
-    :window-height="appConfig.window.height"
-    :fixed-window-size="appConfig.window.fixed"
-    :initial-tab="initialTab"
-    @toggle-always-on-top="$emit('toggleAlwaysOnTop')"
-    @update-window-size="$emit('updateWindowSize', $event)"
-    @config-reloaded="$emit('configReloaded')"
+    :current-theme="props.appConfig.theme"
+    :always-on-top="props.appConfig.window.alwaysOnTop"
+    :window-width="props.appConfig.window.width"
+    :window-height="props.appConfig.window.height"
+    :fixed-window-size="props.appConfig.window.fixed"
+    :initial-tab="props.initialTab"
+    :from-popup="props.fromPopup"
+    @toggle-always-on-top="emit('toggleAlwaysOnTop')"
+    @update-window-size="emit('updateWindowSize', $event)"
+    @config-reloaded="emit('configReloaded')"
+    @close-to-popup="emit('closeToPopup')"
   />
 </template>

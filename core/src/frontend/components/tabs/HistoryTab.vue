@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, withDefaults } from 'vue'
 import { useToast } from '../../composables/useToast'
 import BaseButton from '../base/Button.vue'
 import BaseCard from '../base/Card.vue'
@@ -20,8 +20,17 @@ interface InteractRecord {
 
 const toast = useToast()
 
+interface Props {
+  fromPopup?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  fromPopup: false
+})
+
 const emit = defineEmits<{
   navigateTo: [tab: string]
+  closeToPopup: []
 }>()
 
 // 状态
@@ -96,6 +105,15 @@ function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
 
+// 处理返回按钮点击
+function handleBack() {
+  if (props.fromPopup) {
+    emit('closeToPopup')
+  } else {
+    emit('navigateTo', 'intro')
+  }
+}
+
 onMounted(() => {
   loadHistory()
 })
@@ -104,7 +122,7 @@ onMounted(() => {
 <template>
   <div class="history-tab">
     <div class="header">
-      <button class="back-btn" title="返回" @click="emit('navigateTo', 'intro')">
+      <button class="back-btn" title="返回" @click="handleBack">
         <div class="i-carbon-arrow-left w-4 h-4" />
       </button>
       <h2 class="title">

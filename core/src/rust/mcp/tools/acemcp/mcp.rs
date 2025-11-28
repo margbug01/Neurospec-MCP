@@ -91,6 +91,9 @@ impl AcemcpTool {
 
         let project_root_str = project_root.to_string_lossy().to_string();
         
+        // 更新项目路径缓存（用于前端显示）
+        crate::ui::agents_commands::update_project_path_cache(&project_root_str);
+        
         log_important!(
             info,
             "Code search request: project_root_path={}, query={}, mode={:?}",
