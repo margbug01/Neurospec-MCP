@@ -39,7 +39,7 @@ pub const CORE_TOOLS: &[ToolDefinition] = &[
     },
     ToolDefinition {
         name: "search",
-        description: "🔍 PRIORITY TOOL: Always use this FIRST before reading files! Search for relevant code context in a project. Supports text search (natural language) and symbol search (function/class names). Uses local Tantivy index with Tree-sitter for symbol extraction. This tool is much faster than reading files one by one.",
+        description: "🔍 PRIORITY TOOL: Always use this FIRST before reading files! Structure-first smart search for relevant code context in a project. Recommended usage: set `profile` to `smart_structure` or `structure_only` and use natural language queries. Low-level `mode` (`text`/`symbol`/`structure`) is kept for backward compatibility.",
         is_core: false,
         feature: None,
     },

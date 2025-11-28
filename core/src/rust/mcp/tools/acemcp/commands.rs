@@ -21,6 +21,7 @@ pub async fn debug_acemcp_search(
         project_root_path: Some(project_root_path),
         query,
         mode: None,
+        profile: None,
     };
 
     let search_result = AcemcpTool::search_context(req).await;
@@ -77,6 +78,7 @@ pub async fn execute_acemcp_tool(
                 project_root_path,
                 query,
                 mode: None,
+                profile: None,
             };
 
             match AcemcpTool::search_context(req).await {

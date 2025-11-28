@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
-use super::types::{SearchRequest, SearchMode};
+use super::types::{SearchRequest, SearchMode, SearchProfile, SearchScope, SearchScopeKind, SearchError};
 use super::local_engine::{LocalIndexer, LocalEngineConfig, RipgrepSearcher, CtagsIndexer};
 use crate::log_important;
 use crate::mcp::utils::errors::McpToolError;
@@ -81,39 +81,43 @@ impl AcemcpTool {
                 match detect_project_root() {
                     Some(path) => path,
                     None => {
-                        return Ok(crate::mcp::create_error_result(
-                            "无法自动检测项目路径。请提供 project_root_path 参数，或确保在 Git 仓库中运行。".to_string()
-                        ));
+                        let err = SearchError::invalid_project_path("<auto-detect failed>");
+                        return Ok(crate::mcp::create_error_result(err.to_json()));
                     }
                 }
             }
         };
 
         let project_root_str = project_root.to_string_lossy().to_string();
+        let profile = request.profile.clone();
         
         // 更新项目路径缓存（用于前端显示）
         crate::ui::agents_commands::update_project_path_cache(&project_root_str);
         
         log_important!(
             info,
-            "Code search request: project_root_path={}, query={}, mode={:?}",
+            "Code search request: project_root_path={}, query={}, mode={:?}, profile={:?}",
             project_root_str,
             request.query,
-            request.mode
+            request.mode,
+            profile
         );
         
         // Validate project path
         if !project_root.exists() {
-            return Ok(crate::mcp::create_error_result(format!(
-                "Project path does not exist: {}", project_root_str
-            )));
+            let err = SearchError::invalid_project_path(&project_root_str);
+            return Ok(crate::mcp::create_error_result(err.to_json()));
         }
 
+        // 新模式：profile = StructureOnly 时，仅返回结构概览
+        if let Some(SearchProfile::StructureOnly { max_depth, max_nodes }) = &profile {
+            return Self::get_project_structure(&project_root, *max_depth, *max_nodes).await;
+        }
+
+        // 兼容旧调用：仅当 profile 为空时才使用 mode=Structure
         let mode = request.mode.unwrap_or(SearchMode::Text);
-        
-        // Structure 模式：返回项目结构概览
-        if matches!(mode, SearchMode::Structure) {
-            return Self::get_project_structure(&project_root).await;
+        if profile.is_none() && matches!(mode, SearchMode::Structure) {
+            return Self::get_project_structure(&project_root, None, None).await;
         }
         
         // 检查索引状态，决定使用 Tantivy 还是 ripgrep
@@ -136,11 +140,24 @@ impl AcemcpTool {
                 }
             };
             
-            match mode {
+            let search_result = match mode {
                 // 使用嵌入模型进行语义增强搜索（如果服务可用）
                 SearchMode::Text => searcher.search_with_embedding(&request.query).await,
                 SearchMode::Symbol => searcher.search_symbol(&request.query),
                 SearchMode::Structure => unreachable!("Structure mode handled earlier"),
+            };
+
+            // 如果使用 SmartStructure 配置，对结果应用 scope / max_results 过滤
+            match search_result {
+                Ok(results) => {
+                    let adjusted = Self::apply_smart_profile_filters(
+                        results,
+                        &project_root,
+                        &profile,
+                    );
+                    Ok(adjusted)
+                }
+                Err(e) => Err(e),
             }
         } else {
             // 索引未就绪，使用 ripgrep 回退
@@ -160,6 +177,33 @@ impl AcemcpTool {
         match search_result {
             Ok(results) => {
                 if results.is_empty() {
+                    // 如果使用 SmartStructure 模式但没有结果，自动回退到 StructureOnly
+                    if matches!(&profile, Some(SearchProfile::SmartStructure { .. })) {
+                        log_important!(info, "SmartStructure search returned no results, falling back to StructureOnly");
+                        let fallback_result = Self::get_project_structure(&project_root, Some(3), Some(50)).await?;
+                        
+                        // 提取原始结构内容文本
+                        let structure_text = fallback_result.content.iter()
+                            .filter_map(|c| {
+                                if let Ok(val) = serde_json::to_value(c) {
+                                    val.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        
+                        // 包装返回，提示这是回退结果
+                        let wrapped = format!(
+                            "⚠️ **搜索无结果，已自动回退到项目结构概览**\n\n\
+                             💡 建议：根据下方结构选择相关文件直接读取，或尝试更宽泛的搜索词。\n\n\
+                             ---\n\n{}",
+                            structure_text
+                        );
+                        return Ok(crate::mcp::create_success_result(vec![Content::text(wrapped)]));
+                    }
+                    
                     return Ok(crate::mcp::create_success_result(vec![Content::text(
                         "No relevant code context found."
                     )]));
@@ -242,9 +286,60 @@ impl AcemcpTool {
                     formatted.push_str("```\n\n");
                 }
                 
+                // 如果使用 SmartStructure 模式，在结果末尾添加上下文汇总
+                if matches!(&profile, Some(SearchProfile::SmartStructure { .. })) {
+                    formatted.push_str("\n---\n\n");
+                    
+                    // 1. 匹配分布（按目录聚合，最多 5 个）
+                    let mut dir_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+                    for res in &results {
+                        let dir = std::path::Path::new(&res.path)
+                            .parent()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|| ".".to_string());
+                        *dir_counts.entry(dir).or_insert(0) += 1;
+                    }
+                    
+                    let mut dir_list: Vec<_> = dir_counts.into_iter().collect();
+                    dir_list.sort_by(|a, b| b.1.cmp(&a.1)); // 按匹配数降序
+                    
+                    formatted.push_str("## 📁 匹配分布\n\n");
+                    formatted.push_str("| 目录 | 匹配数 |\n");
+                    formatted.push_str("|------|--------|\n");
+                    for (dir, count) in dir_list.iter().take(5) {
+                        formatted.push_str(&format!("| `{}` | {} |\n", dir, count));
+                    }
+                    formatted.push_str("\n");
+                    
+                    // 2. 关键符号（从 context 中提取，最多 10 个）
+                    let mut symbols: Vec<(String, String, usize)> = Vec::new(); // (name, path, line)
+                    for res in &results {
+                        if let Some(ref ctx) = res.context {
+                            if let Some(ref parent) = ctx.parent_symbol {
+                                symbols.push((parent.clone(), res.path.clone(), res.line_number));
+                            }
+                        }
+                    }
+                    
+                    // 去重
+                    symbols.sort_by(|a, b| a.0.cmp(&b.0));
+                    symbols.dedup_by(|a, b| a.0 == b.0);
+                    
+                    if !symbols.is_empty() {
+                        formatted.push_str("## 🔗 关键符号\n\n");
+                        for (name, path, line) in symbols.iter().take(10) {
+                            formatted.push_str(&format!("- `{}` (`{}`:{})\n", name, path, line));
+                        }
+                        formatted.push_str("\n");
+                    }
+                }
+                
                 Ok(crate::mcp::create_success_result(vec![Content::text(formatted)]))
             }
-            Err(e) => Ok(crate::mcp::create_error_result(format!("Search failed: {}", e)))
+            Err(e) => {
+                let err = SearchError::search_engine_error(&e.to_string());
+                Ok(crate::mcp::create_error_result(err.to_json()))
+            }
         }
     }
 
@@ -264,9 +359,8 @@ impl AcemcpTool {
         
         // 检查 ripgrep 是否可用
         if !RipgrepSearcher::is_available() {
-            return Ok(crate::mcp::create_error_result(
-                "Search index not ready and ripgrep not available. Please install ripgrep (rg) or wait for indexing to complete.".to_string()
-            ));
+            let err = SearchError::index_not_ready();
+            return Ok(crate::mcp::create_error_result(err.to_json()));
         }
 
         let rg_searcher = RipgrepSearcher::new(10, 3);
@@ -292,7 +386,10 @@ impl AcemcpTool {
                 
                 Ok(crate::mcp::create_success_result(vec![Content::text(formatted)]))
             }
-            Err(e) => Ok(crate::mcp::create_error_result(format!("Ripgrep search failed: {}", e)))
+            Err(e) => {
+                let err = SearchError::io_error(&e.to_string());
+                Ok(crate::mcp::create_error_result(err.to_json()))
+            }
         }
     }
 
@@ -316,7 +413,10 @@ impl AcemcpTool {
                     }
                     Ok(crate::mcp::create_success_result(vec![Content::text(formatted)]))
                 }
-                Err(e) => Ok(crate::mcp::create_error_result(format!("Search failed: {}", e)))
+                Err(e) => {
+                    let err = SearchError::io_error(&e.to_string());
+                    Ok(crate::mcp::create_error_result(err.to_json()))
+                }
             };
         }
 
@@ -413,6 +513,69 @@ impl AcemcpTool {
         });
     }
 
+    /// 根据 SmartStructure profile 对搜索结果进行 scope / max_results 过滤
+    fn apply_smart_profile_filters(
+        mut results: Vec<crate::mcp::tools::acemcp::local_engine::types::SearchResult>,
+        project_root: &PathBuf,
+        profile: &Option<SearchProfile>,
+    ) -> Vec<crate::mcp::tools::acemcp::local_engine::types::SearchResult> {
+        let Some(SearchProfile::SmartStructure { scope, max_results }) = profile.as_ref() else {
+            return results;
+        };
+
+        // 作用域过滤（目前只对 Folder/File 生效，Project/Symbol 不做额外限制）
+        if let Some(scope) = scope.as_ref() {
+            let root_str = project_root.to_string_lossy().to_string();
+
+            results.retain(|res| Self::matches_scope(&root_str, &res.path, scope));
+        }
+
+        // 结果数量裁剪
+        if let Some(max) = *max_results {
+            let max = max as usize;
+            if results.len() > max {
+                results.truncate(max);
+            }
+        }
+
+        results
+    }
+
+    /// 判断搜索结果是否命中指定 scope
+    fn matches_scope(project_root: &str, result_path: &str, scope: &SearchScope) -> bool {
+        use std::path::Path;
+
+        match scope.kind {
+            SearchScopeKind::Project => true,
+            SearchScopeKind::Folder => {
+                if let Some(ref folder) = scope.path {
+                    let base = if Path::new(folder).is_absolute() {
+                        folder.clone()
+                    } else {
+                        format!("{}/{}", project_root, folder)
+                    };
+                    result_path.starts_with(&base)
+                } else {
+                    true
+                }
+            }
+            SearchScopeKind::File => {
+                if let Some(ref file) = scope.path {
+                    if Path::new(file).is_absolute() {
+                        result_path == *file
+                    } else {
+                        let full = format!("{}/{}", project_root, file);
+                        result_path == full
+                    }
+                } else {
+                    true
+                }
+            }
+            // 暂不根据符号名做进一步过滤，后续可以结合 SnippetContext/MatchInfo 增强
+            SearchScopeKind::Symbol => true,
+        }
+    }
+
     /// 启动文件变化监听循环
     /// 
     /// 使用自适应休眠策略：
@@ -465,11 +628,29 @@ impl AcemcpTool {
     /// - 模块映射 (分层目录结构)
     /// - 依赖图谱 (模块间调用关系)
     /// - 核心符号 (公开 API/入口点)
-    async fn get_project_structure(project_root: &PathBuf) -> Result<CallToolResult, McpToolError> {
+    /// 并根据可选的 max_depth / max_nodes 进行简单裁剪。
+    async fn get_project_structure(
+        project_root: &PathBuf,
+        max_depth: Option<u8>,
+        max_nodes: Option<u32>,
+    ) -> Result<CallToolResult, McpToolError> {
         log_important!(info, "Generating Project Insight for: {}", project_root.display());
         
         // 🚀 优化：单次遍历收集基础信息和模块映射
-        let (lang_stats, total_files, module_map) = Self::collect_project_data(project_root);
+        let (lang_stats, total_files, mut module_map) = Self::collect_project_data(project_root);
+
+        // 按深度和节点数量进行裁剪（如果配置了）
+        if let Some(limit_depth) = max_depth {
+            let limit = limit_depth as usize;
+            module_map.retain(|m| m.depth <= limit);
+        }
+
+        if let Some(max_nodes) = max_nodes {
+            let limit = max_nodes as usize;
+            if module_map.len() > limit {
+                module_map.truncate(limit);
+            }
+        }
         
         // 生成依赖图谱 (使用 CodeGraph)
         let dependencies = Self::generate_dependency_graph(project_root);

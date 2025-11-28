@@ -51,17 +51,71 @@
    - 基于 search 结果，精确读取目标文件
 
 ### 代码搜索（优先级最高）
-使用 `search` 工具查找代码：
-- **text 模式：** 自然语言查询，如 `search(query="用户认证逻辑", mode="text")`
-- **symbol 模式：** 精确符号查找，如 `search(query="handleLogin", mode="symbol")`
-- **structure 模式：** 获取项目结构概览，如 `search(query="", mode="structure")`
-  - 返回：文件总数、语言分布、关键入口文件
-  - 适用场景：首次接触项目、需要全局视野时
 
-> ⚠️ **重要：必须显式指定 `mode` 参数**
-> 
-> 调用 search 时**必须**明确指定 `mode="text"` / `mode="symbol"` / `mode="structure"`，
-> 避免依赖默认值导致某些 IDE 工具调用失败。
+使用 `search` 工具查找代码。**推荐使用 `profile` 参数**（结构优先模式），而非旧的 `mode` 参数。
+
+#### 推荐用法：`profile` 模式
+
+**1. SmartStructure（智能结构搜索，推荐默认）**
+
+先做结构分析，再在候选范围内精搜：
+
+```json
+{
+  "project_root_path": "/path/to/project",
+  "query": "修复用户认证逻辑",
+  "profile": {
+    "smart_structure": {
+      "scope": { "kind": "project" },
+      "max_results": 15
+    }
+  }
+}
+```
+
+可选 `scope` 配置：
+- `kind: "project"` - 整个项目（默认）
+- `kind: "folder", path: "src/auth"` - 仅在指定文件夹下搜索
+- `kind: "file", path: "src/auth/handler.rs"` - 仅在指定文件内搜索
+- `kind: "symbol", symbol: "handleLogin"` - 聚焦某个符号
+
+**2. StructureOnly（仅结构概览）**
+
+首次接触项目或需要全局视野时：
+
+```json
+{
+  "project_root_path": "/path/to/project",
+  "profile": {
+    "structure_only": {
+      "max_depth": 3,
+      "max_nodes": 100
+    }
+  }
+}
+```
+
+#### 旧用法：`mode` 模式（兼容保留）
+
+仍然可用，但不再推荐：
+- `mode: "text"` - 全文搜索
+- `mode: "symbol"` - 符号定义搜索
+- `mode: "structure"` - 项目结构概览
+
+```json
+{
+  "project_root_path": "/path/to/project",
+  "query": "handleLogin",
+  "mode": "symbol"
+}
+```
+
+#### 错误码说明
+
+search 工具可能返回以下错误码（用于自动降级/重试）：
+- `INDEX_NOT_READY` - 索引尚未就绪，正在后台构建
+- `INVALID_PROJECT_PATH` - 项目路径无效或不存在
+- `IO_ERROR` - 文件读取/写入错误
 
 **为什么必须先 search？**
 - ✅ 避免盲目读取无关文件
