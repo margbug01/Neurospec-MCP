@@ -153,17 +153,78 @@
 
 ## search - 代码搜索
 
-高效的代码搜索引擎，支持全文搜索和符号搜索。
+使用本地索引（Tantivy + Tree-sitter）和 ripgrep 提供的统一搜索引擎，支持：
+
+- **全文搜索 (Text)**
+- **符号搜索 (Symbol)**
+- **结构概览 (Structure / StructureOnly)**
+- **SmartStructure（结构感知搜索，推荐给 LLM）**
 
 ### 参数
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `query` | string | ✅ | 搜索查询 |
-| `mode` | string | ❌ | 搜索模式（默认 `text`） |
-| `project_root_path` | string | ❌ | 项目根路径（自动检测） |
+| `query` | string | ✅ | 搜索查询；在 SmartStructure 下推荐自然语言描述 |
+| `project_root_path` | string | ❌ | 项目根路径（自动检测 Git 根或 CWD） |
+| `mode` | string | ❌ | 低层搜索模式：`text` / `symbol` / `structure`（**兼容旧调用，不推荐直接设置**） |
+| `profile` | object | ❌ | 高层搜索策略：`smart_structure` / `structure_only`（**推荐**） |
 
-### 搜索模式
+### 高层 profile 模式（推荐）
+
+#### SmartStructure - 结构感知搜索（推荐默认）
+
+特点：
+
+- 使用本地索引 + `scope` / `max_results` 对结果做结构感知过滤
+- 在结果中附带「匹配分布」「关键符号」等结构视角汇总
+- 当无结果时自动回退到项目结构概览（内部走 `StructureOnly`）
+
+请求示例：
+
+```json
+{
+  "project_root_path": "/path/to/project",
+  "query": "修复用户认证逻辑",
+  "profile": {
+    "smart_structure": {
+      "scope": { "kind": "project" },
+      "max_results": 15
+    }
+  }
+}
+```
+
+`scope` 可选值：
+
+- `project`：全项目（默认）
+- `folder`：仅在指定文件夹下搜索（支持相对路径）
+- `file`：仅在指定文件内搜索
+- `symbol`：预留，用于将来结合符号索引做更精细的过滤
+
+#### StructureOnly - 仅结构概览
+
+用于快速建立对项目的宏观认识或在 SmartStructure 0 结果时作为回退：
+
+```json
+{
+  "project_root_path": "/path/to/project",
+  "profile": {
+    "structure_only": {
+      "max_depth": 3,
+      "max_nodes": 100
+    }
+  }
+}
+```
+
+返回内容包括：
+
+- 语言分布
+- 模块/目录树（按深度裁剪）
+- 依赖关系概览（在启用 experimental-neurospec 时）
+- 关键符号/入口点
+
+### 低层 mode 模式（兼容保留）
 
 #### text - 全文搜索
 
@@ -189,7 +250,7 @@
 
 精确查找函数、类、变量定义。
 
-#### structure - 项目结构
+#### structure - 项目结构（legacy）
 
 ```json
 {
@@ -199,10 +260,7 @@
 }
 ```
 
-返回项目结构概览：
-- 文件总数
-- 语言分布
-- 关键入口文件
+等价于 `profile = { "structure_only": { ... } }` 的旧模式，仅在 `profile` 未设置时生效。
 
 ### 响应格式
 

@@ -31,6 +31,19 @@ pub fn update_project_path_cache(path: &str) {
     }
 }
 
+/// 获取缓存的项目路径（供 MCP search 使用）
+pub fn get_cached_project_path() -> Option<String> {
+    // 1. 优先从内存缓存获取
+    if let Ok(cache) = get_cache().lock() {
+        if let Some(ref path) = *cache {
+            return Some(path.clone());
+        }
+    }
+    
+    // 2. 从配置文件加载
+    load_project_path_config()
+}
+
 /// 检测项目响应
 #[derive(Serialize)]
 pub struct DetectProjectResponse {

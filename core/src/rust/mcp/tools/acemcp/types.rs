@@ -1,4 +1,33 @@
 use serde::{Deserialize, Serialize};
+use schemars::gen::SchemaGenerator;
+use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
+
+/// 自定义 schema：同时接受字符串和 SearchProfile 对象
+/// 用于兼容某些 MCP 客户端（如 Kiro）把嵌套对象序列化为字符串的情况
+fn profile_schema(gen: &mut SchemaGenerator) -> Schema {
+    let profile_schema = gen.subschema_for::<SearchProfile>();
+    Schema::Object(SchemaObject {
+        metadata: Some(Box::new(schemars::schema::Metadata {
+            description: Some("High-level search profile. Accepts JSON object or JSON string (for client compatibility).".to_string()),
+            ..Default::default()
+        })),
+        subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
+            any_of: Some(vec![
+                Schema::Object(SchemaObject {
+                    instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::String))),
+                    ..Default::default()
+                }),
+                Schema::Object(SchemaObject {
+                    instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::Null))),
+                    ..Default::default()
+                }),
+                profile_schema,
+            ]),
+            ..Default::default()
+        })),
+        ..Default::default()
+    })
+}
 
 /// 低层搜索模式（兼容旧调用 & 内部实现用）
 ///
@@ -112,8 +141,10 @@ pub struct SearchRequest {
     ///
     /// 当设置该字段时，后端会根据 profile 执行结构优先的 orchestrator 逻辑；
     /// 未设置时则回退到旧的 mode 行为。
+    /// 
+    /// 注意：为兼容某些客户端，此字段同时接受 JSON 对象和 JSON 字符串。
     #[serde(default)]
-    #[schemars(description = "High-level search profile. Recommended for LLMs. When set, the backend orchestrates structure-first search and internal text/symbol lookups.")]
+    #[schemars(schema_with = "profile_schema")]
     pub profile: Option<SearchProfile>,
 }
 
@@ -185,5 +216,63 @@ impl SearchError {
         serde_json::to_string(self).unwrap_or_else(|_| {
             format!(r#"{{"code":"UNKNOWN_ERROR","message":"{}","retryable":false}}"#, self.message)
         })
+    }
+}
+
+/// 搜索追踪信息（用于结构化日志和调试）
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchTrace {
+    /// 请求唯一标识
+    pub request_id: String,
+    /// 查询字符串
+    pub query: String,
+    /// 搜索模式
+    pub mode: String,
+    /// Profile 类型（如果有）
+    pub profile: Option<String>,
+    /// 实际使用的引擎
+    pub engine_used: String,
+    /// 索引健康状态
+    pub index_health: String,
+    /// 结果数量
+    pub result_count: usize,
+    /// 执行时长（毫秒）
+    pub duration_ms: u64,
+    /// 降级链（如有回退）
+    pub fallback_chain: Vec<String>,
+    /// 是否触发了索引
+    pub triggered_indexing: bool,
+}
+
+impl SearchTrace {
+    pub fn new(query: String, mode: String) -> Self {
+        Self {
+            request_id: Self::generate_request_id(),
+            query,
+            mode,
+            profile: None,
+            engine_used: String::new(),
+            index_health: String::new(),
+            result_count: 0,
+            duration_ms: 0,
+            fallback_chain: Vec::new(),
+            triggered_indexing: false,
+        }
+    }
+    
+    fn generate_request_id() -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        format!("search_{}", timestamp)
+    }
+    
+    /// 输出为 JSON 日志
+    pub fn log(&self) {
+        if let Ok(json) = serde_json::to_string(self) {
+            crate::log_important!(info, "SearchTrace: {}", json);
+        }
     }
 }

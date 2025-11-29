@@ -25,11 +25,18 @@ pub use global::{
     create_searcher_for_project,
     is_search_initialized,
     // 索引状态管理
+    IndexState,
+    IndexHealth,
+    EmbeddingStatus,
     ProjectIndexState,
     is_project_indexed,
     is_project_indexing,
     mark_indexing_started,
     mark_indexing_complete,
+    mark_index_corrupted,
     get_index_state,
     get_indexed_file_count,
+    assess_index_health,
+    transition_index_state,
+    update_embedding_status,
 };

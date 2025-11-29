@@ -7,7 +7,37 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use crate::mcp::types::{McpResponse, McpResponseContent};
 
 /// 获取临时图片保存目录
+/// 
+/// 优先保存到工作区内的 .neurospec/temp/images 目录，
+/// 这样 AI 助手可以通过 readFile 访问图片。
+/// 如果无法确定工作区，回退到系统临时目录。
 fn get_temp_image_dir() -> PathBuf {
+    // 尝试获取工作区目录（通过 Git 根目录或当前目录）
+    if let Ok(cwd) = std::env::current_dir() {
+        // 向上查找 .git 目录确定项目根
+        let mut current = cwd.as_path();
+        loop {
+            if current.join(".git").exists() {
+                let workspace_temp = current.join(".neurospec").join("temp").join("images");
+                if fs::create_dir_all(&workspace_temp).is_ok() {
+                    return workspace_temp;
+                }
+                break;
+            }
+            match current.parent() {
+                Some(parent) => current = parent,
+                None => break,
+            }
+        }
+        
+        // 没找到 .git，使用当前目录
+        let workspace_temp = cwd.join(".neurospec").join("temp").join("images");
+        if fs::create_dir_all(&workspace_temp).is_ok() {
+            return workspace_temp;
+        }
+    }
+    
+    // 回退到系统临时目录
     let temp_dir = std::env::temp_dir().join("neurospec").join("images");
     let _ = fs::create_dir_all(&temp_dir);
     temp_dir
@@ -188,11 +218,6 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
 
         // 生成图片信息
         let base64_len = image.data.len();
-        let preview = if base64_len > 50 {
-            format!("{}...", &image.data[..50])
-        } else {
-            image.data.clone()
-        };
 
         // 计算图片大小
         let estimated_size = (base64_len * 3) / 4;
@@ -204,13 +229,15 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
             format!("{:.1} MB", estimated_size as f64 / (1024.0 * 1024.0))
         };
 
-        let filename_info = image.filename.as_ref()
-            .map(|f| format!("\n文件名: {}", f))
-            .unwrap_or_default();
+        // 使用 Markdown 内联 Base64 格式，让 AI 能直接看到图片
+        let markdown_image = format!(
+            "![图片 {}](data:{};base64,{})",
+            index + 1, image.media_type, image.data
+        );
 
         let image_info = format!(
-            "=== 图片 {} ==={}\n类型: {}\n大小: {}\nBase64 预览: {}\n完整 Base64 长度: {} 字符",
-            index + 1, filename_info, image.media_type, size_str, preview, base64_len
+            "=== 图片 {} ===\n类型: {}\n大小: {}\n\n{}",
+            index + 1, image.media_type, size_str, markdown_image
         );
         image_info_parts.push(image_info);
     }

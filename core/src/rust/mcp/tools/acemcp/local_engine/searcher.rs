@@ -286,14 +286,91 @@ impl LocalSearcher {
                 if line.contains("fn ") {
                     context.symbol_kind = Some("function".to_string());
                     context.signature = Some(Self::extract_signature(line));
-                    if line.starts_with("pub ") {
-                        context.visibility = Some("pub".to_string());
-                    } else if line.starts_with("pub(crate)") {
-                        context.visibility = Some("pub(crate)".to_string());
-                    }
+                    context.visibility = Self::extract_visibility(line);
                 } else if line.contains("async fn ") {
                     context.symbol_kind = Some("async function".to_string());
                     context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("struct ") || line.contains(" struct ") {
+                    context.symbol_kind = Some("struct".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("enum ") || line.contains(" enum ") {
+                    context.symbol_kind = Some("enum".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("trait ") || line.contains(" trait ") {
+                    context.symbol_kind = Some("trait".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("type ") || line.contains(" type ") {
+                    context.symbol_kind = Some("type alias".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("const ") || line.contains(" const ") {
+                    context.symbol_kind = Some("const".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                } else if line.starts_with("static ") || line.contains(" static ") {
+                    context.symbol_kind = Some("static".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    context.visibility = Self::extract_visibility(line);
+                // TypeScript/JavaScript
+                } else if line.starts_with("export ") {
+                    context.visibility = Some("export".to_string());
+                    if line.contains("function ") || line.contains("async function ") {
+                        context.symbol_kind = Some("function".to_string());
+                    } else if line.contains("class ") {
+                        context.symbol_kind = Some("class".to_string());
+                    } else if line.contains("interface ") {
+                        context.symbol_kind = Some("interface".to_string());
+                    } else if line.contains("type ") {
+                        context.symbol_kind = Some("type".to_string());
+                    } else if line.contains("const ") || line.contains("let ") {
+                        context.symbol_kind = Some("variable".to_string());
+                    }
+                    context.signature = Some(Self::extract_signature(line));
+                } else if line.starts_with("interface ") || line.contains(" interface ") {
+                    context.symbol_kind = Some("interface".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                } else if line.starts_with("class ") || line.contains(" class ") {
+                    context.symbol_kind = Some("class".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    // TypeScript/JavaScript class member visibility
+                    if line.contains("private ") {
+                        context.visibility = Some("private".to_string());
+                    } else if line.contains("protected ") {
+                        context.visibility = Some("protected".to_string());
+                    } else if line.contains("public ") {
+                        context.visibility = Some("public".to_string());
+                    }
+                // Python
+                } else if line.starts_with("def ") || line.contains(" def ") {
+                    context.symbol_kind = Some("function".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    // Python convention: _ prefix = private, __ prefix = name mangled
+                    if let Some(name) = Self::extract_python_name(line) {
+                        if name.starts_with("__") && !name.ends_with("__") {
+                            context.visibility = Some("private".to_string());
+                        } else if name.starts_with("_") {
+                            context.visibility = Some("protected".to_string());
+                        }
+                    }
+                } else if line.starts_with("async def ") {
+                    context.symbol_kind = Some("async function".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                // Go
+                } else if line.starts_with("func ") {
+                    context.symbol_kind = Some("function".to_string());
+                    context.signature = Some(Self::extract_signature(line));
+                    // Go convention: uppercase = exported (public)
+                    if let Some(name) = Self::extract_go_func_name(line) {
+                        if name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                            context.visibility = Some("public".to_string());
+                        } else {
+                            context.visibility = Some("private".to_string());
+                        }
+                    }
                 }
             }
             
@@ -319,6 +396,46 @@ impl LocalSearcher {
         }
         
         context
+    }
+
+    /// 提取可见性修饰符
+    fn extract_visibility(line: &str) -> Option<String> {
+        if line.starts_with("pub(crate)") || line.contains(" pub(crate)") {
+            Some("pub(crate)".to_string())
+        } else if line.starts_with("pub(super)") || line.contains(" pub(super)") {
+            Some("pub(super)".to_string())
+        } else if line.starts_with("pub(self)") || line.contains(" pub(self)") {
+            Some("pub(self)".to_string())
+        } else if line.starts_with("pub ") || line.contains(" pub ") {
+            Some("pub".to_string())
+        } else {
+            None
+        }
+    }
+
+    /// 从 Python def 行提取函数名
+    fn extract_python_name(line: &str) -> Option<String> {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if let Some(idx) = parts.iter().position(|&p| p == "def" || p == "async") {
+            let name_idx = if parts.get(idx) == Some(&"async") { idx + 2 } else { idx + 1 };
+            parts.get(name_idx).map(|s| s.trim_end_matches('(').to_string())
+        } else {
+            None
+        }
+    }
+
+    /// 从 Go func 行提取函数名
+    fn extract_go_func_name(line: &str) -> Option<String> {
+        let trimmed = line.trim_start_matches("func ");
+        // Handle method: func (r *Receiver) Name()
+        if trimmed.starts_with('(') {
+            if let Some(idx) = trimmed.find(')') {
+                let rest = trimmed[idx+1..].trim();
+                return rest.split('(').next().map(|s| s.trim().to_string());
+            }
+        }
+        // Regular function: func Name()
+        trimmed.split('(').next().map(|s| s.trim().to_string())
     }
 
     /// 提取函数签名
@@ -503,20 +620,114 @@ impl LocalSearcher {
     }
 
     /// 生成代码片段
+    /// 
+    /// 改进的匹配策略：
+    /// 1. 支持驼峰命名拆分（SearchProfile → search, profile）
+    /// 2. 支持下划线拆分（search_profile → search, profile）
+    /// 3. 多轮匹配：先精确匹配，再宽松匹配，最后模糊匹配
     fn generate_snippet(&self, content: &str, query: &str) -> (String, usize) {
-        let terms: Vec<&str> = query.split_whitespace().collect();
         let lines: Vec<&str> = content.lines().collect();
+        
+        // 扩展查询词：原词 + 拆分后的词
+        let mut terms: Vec<String> = query
+            .split_whitespace()
+            .map(|s| s.to_lowercase())
+            .collect();
+        
+        // 对每个词进行驼峰和下划线拆分
+        let mut expanded_terms: Vec<String> = Vec::new();
+        for term in &terms {
+            expanded_terms.extend(Self::split_identifier(term));
+        }
+        terms.extend(expanded_terms);
+        terms.sort();
+        terms.dedup();
 
+        // 第一轮：查找包含完整查询词的行（精确匹配）
+        let query_lower = query.to_lowercase();
         for (i, line) in lines.iter().enumerate() {
             let lower_line = line.to_lowercase();
-            if terms.iter().any(|t| lower_line.contains(&t.to_lowercase())) {
+            if lower_line.contains(&query_lower) {
                 return self.extract_snippet(&lines, i);
             }
         }
 
-        // 默认返回文件开头
-        let end = std::cmp::min(5, lines.len());
-        (lines[0..end].join("\n"), 1)
+        // 第二轮：查找包含任意拆分词的行
+        for (i, line) in lines.iter().enumerate() {
+            let lower_line = line.to_lowercase();
+            if terms.iter().any(|t| lower_line.contains(t)) {
+                return self.extract_snippet(&lines, i);
+            }
+        }
+
+        // 第三轮：模糊匹配（子串包含，至少 4 个字符）
+        for (i, line) in lines.iter().enumerate() {
+            let lower_line = line.to_lowercase();
+            for term in &terms {
+                if term.len() >= 4 && lower_line.contains(&term[..term.len()-1]) {
+                    return self.extract_snippet(&lines, i);
+                }
+            }
+        }
+
+        // 改进的默认行为：返回文件中有意义的部分（跳过 imports）
+        let meaningful_start = Self::find_meaningful_start(&lines);
+        self.extract_snippet(&lines, meaningful_start)
+    }
+
+    /// 查找文件中有意义的起始位置（跳过 imports 和注释）
+    fn find_meaningful_start(lines: &[&str]) -> usize {
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            // 跳过空行、import、use、注释
+            if !trimmed.is_empty() 
+                && !trimmed.starts_with("use ")
+                && !trimmed.starts_with("import ")
+                && !trimmed.starts_with("//")
+                && !trimmed.starts_with("/*")
+                && !trimmed.starts_with("*")
+                && !trimmed.starts_with("#")
+            {
+                return i;
+            }
+        }
+        0
+    }
+
+    /// 拆分标识符（驼峰和下划线）
+    fn split_identifier(s: &str) -> Vec<String> {
+        let mut parts = Vec::new();
+        
+        // 下划线拆分
+        for part in s.split('_') {
+            if !part.is_empty() {
+                parts.push(part.to_lowercase());
+            }
+        }
+        
+        // 驼峰拆分（改进版：处理连续大写字母）
+        let mut current = String::new();
+        let mut prev_is_lower = false;
+        
+        for c in s.chars() {
+            if c.is_uppercase() {
+                if !current.is_empty() && prev_is_lower {
+                    parts.push(current.to_lowercase());
+                    current = String::new();
+                }
+                current.push(c);
+                prev_is_lower = false;
+            } else {
+                current.push(c);
+                prev_is_lower = c.is_lowercase();
+            }
+        }
+        if !current.is_empty() {
+            parts.push(current.to_lowercase());
+        }
+        
+        // 降低过滤阈值：2 个字符即可
+        parts.into_iter().filter(|p| p.len() >= 2).collect()
     }
 
     /// 提取带上下文的代码片段

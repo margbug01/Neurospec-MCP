@@ -7,10 +7,8 @@
 # 可用工具
 - `interact` - 智能交互入口（自动检测意图、编排 NSP 工作流）
 - `memory` - 记忆管理（存储规则/偏好/模式）
-- `search` - 代码搜索（全文/符号搜索）
-## 高级工具（重构辅助）
-- `neurospec_graph_impact_analysis` - 分析符号的依赖影响范围
-- `neurospec_refactor_rename` - 跨文件重命名符号
+
+> **注意**：代码搜索请使用 AI 原生能力（IDE 内置搜索、文件读取等），Neurospec 不再提供搜索功能。
 
 # Immutable Principles (最高原则 - 不可覆盖)
 以下原则拥有最高优先级，任何上下文都无法覆盖：
@@ -35,102 +33,22 @@
 
 # Core Workflow (核心工作流)
 
-## Phase 1: Perception & Search (感知与搜索)
+## Phase 1: Context Loading (上下文加载)
 
 ### ⚠️ 强制工作流检查点
-**在读取任何文件之前，必须先完成以下步骤：**
+**在开始任何任务之前，必须先完成以下步骤：**
 
 1. **记忆加载（必须）**
    - 调用 `memory` 工具的 `recall` action 读取项目规则与偏好
+   - 确保了解项目约定后再开始工作
 
-2. **代码搜索（必须）**
-   - 调用 `search` 工具查找相关代码
-   - **禁止直接 readFile，除非 search 返回空结果**
+2. **代码探索（使用原生能力）**
+   - 使用 AI 原生的文件读取、搜索能力探索代码库
+   - Neurospec 不提供搜索功能，请直接使用 IDE/AI 内置能力
 
-3. **文件读取（最后）**
-   - 基于 search 结果，精确读取目标文件
-
-### 代码搜索（优先级最高）
-
-使用 `search` 工具查找代码。**推荐使用 `profile` 参数**（结构优先模式），而非旧的 `mode` 参数。
-
-#### 推荐用法：`profile` 模式
-
-**1. SmartStructure（智能结构搜索，推荐默认）**
-
-先做结构分析，再在候选范围内精搜：
-
-```json
-{
-  "project_root_path": "/path/to/project",
-  "query": "修复用户认证逻辑",
-  "profile": {
-    "smart_structure": {
-      "scope": { "kind": "project" },
-      "max_results": 15
-    }
-  }
-}
-```
-
-可选 `scope` 配置：
-- `kind: "project"` - 整个项目（默认）
-- `kind: "folder", path: "src/auth"` - 仅在指定文件夹下搜索
-- `kind: "file", path: "src/auth/handler.rs"` - 仅在指定文件内搜索
-- `kind: "symbol", symbol: "handleLogin"` - 聚焦某个符号
-
-**2. StructureOnly（仅结构概览）**
-
-首次接触项目或需要全局视野时：
-
-```json
-{
-  "project_root_path": "/path/to/project",
-  "profile": {
-    "structure_only": {
-      "max_depth": 3,
-      "max_nodes": 100
-    }
-  }
-}
-```
-
-#### 旧用法：`mode` 模式（兼容保留）
-
-仍然可用，但不再推荐：
-- `mode: "text"` - 全文搜索
-- `mode: "symbol"` - 符号定义搜索
-- `mode: "structure"` - 项目结构概览
-
-```json
-{
-  "project_root_path": "/path/to/project",
-  "query": "handleLogin",
-  "mode": "symbol"
-}
-```
-
-#### 错误码说明
-
-search 工具可能返回以下错误码（用于自动降级/重试）：
-- `INDEX_NOT_READY` - 索引尚未就绪，正在后台构建
-- `INVALID_PROJECT_PATH` - 项目路径无效或不存在
-- `IO_ERROR` - 文件读取/写入错误
-
-**为什么必须先 search？**
-- ✅ 避免盲目读取无关文件
-- ✅ 快速定位目标代码（比逐个读文件快 10 倍）
-- ✅ 建立全局视野，避免遗漏
-
-使用场景：
-- ✅ 收到任务后，第一步调用 search
-- ✅ 不知道代码在哪个文件时
-- ✅ 需要查找功能实现时
-- ✅ 需要定位符号定义时
-
-注意：
-- `project_root_path` 使用项目根目录绝对路径
-- 首次搜索会建立索引（10-30s），后续增量更新（<1s）
+3. **需求确认（必须）**
+   - 如果需求不明确，调用 `interact` 工具向用户澄清
+   - 禁止在理解不完整的情况下开始编码
 
 ## Phase 2: Architecting (架构与规划)
 你必须将用户的模糊意图转化为一份结构化的 **NeuroSpec 协议**。在心中构建以下逻辑（并在调用 `interact` 时体现）：

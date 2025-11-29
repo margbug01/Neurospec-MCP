@@ -140,12 +140,17 @@ impl LocalIndexer {
     /// 增量索引目录
     pub fn index_directory(&mut self, root: &Path) -> Result<usize> {
         let root_key = root.to_string_lossy().to_string();
+        
+        crate::log_important!(info, "Starting index for: {}", root_key);
+        crate::log_important!(info, "Index path: {:?}", self.config.index_path);
+        
         let mut metadata = self.load_metadata();
         let project_cache = metadata.projects.entry(root_key.clone()).or_default();
 
         let mut indexed_count = 0;
         let mut skipped_count = 0;
         let mut current_files: HashMap<String, FileMetadata> = HashMap::new();
+        let mut total_walked = 0;
 
         // 使用 ignore crate 遵守 .gitignore 规则
         let walker = WalkBuilder::new(root)
@@ -156,6 +161,8 @@ impl LocalIndexer {
             .build();
         
         for entry in walker.filter_map(|e| e.ok()) {
+            total_walked += 1;
+            
             // ignore::DirEntry 的 file_type() 返回 Option<FileType>
             let is_file = entry.file_type()
                 .map(|t| t.is_file())
@@ -185,7 +192,12 @@ impl LocalIndexer {
                         crate::log_important!(error, "Failed to index file {:?}: {}", path, e);
                     } else {
                         indexed_count += 1;
-                        current_files.insert(rel_path, new_meta);
+                        current_files.insert(rel_path.clone(), new_meta);
+                        
+                        // 每 100 个文件输出一次进度
+                        if indexed_count % 100 == 0 {
+                            crate::log_important!(info, "Indexed {} files...", indexed_count);
+                        }
                     }
                 }
                 None => {
@@ -199,29 +211,38 @@ impl LocalIndexer {
         }
 
         // 更新元数据缓存
+        let total_files = current_files.len();
         metadata.projects.insert(root_key, current_files);
         self.save_metadata(&metadata)?;
 
         self.commit()?;
-
         crate::log_important!(
             info,
-            "Index complete: {} indexed, {} skipped (unchanged)",
+            "Index complete: {} indexed, {} skipped (unchanged), {} total files, {} entries walked",
             indexed_count,
-            skipped_count
+            skipped_count,
+            total_files,
+            total_walked
         );
 
-        // 异步更新向量存储
+        // 异步更新向量存储（仅在有 Tokio runtime 时执行）
         if indexed_count > 0 {
             let root_path = root.to_path_buf();
-            tokio::spawn(async move {
-                if let Err(e) = Self::update_vector_store(&root_path).await {
-                    crate::log_important!(warn, "Failed to update vector store: {}", e);
-                }
-            });
+            // 使用 try_current() 检测是否在 Tokio runtime 上下文中
+            // 避免在 std::thread::spawn 的后台线程中调用 tokio::spawn 导致 panic
+            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                handle.spawn(async move {
+                    if let Err(e) = Self::update_vector_store(&root_path).await {
+                        crate::log_important!(warn, "Failed to update vector store: {}", e);
+                    }
+                });
+            } else {
+                crate::log_important!(info, "Skipping vector store update (no async runtime available)");
+            }
         }
 
-        Ok(indexed_count)
+        // 返回总文件数（而非本次新索引数），用于正确显示索引状态
+        Ok(total_files)
     }
 
     /// 异步更新向量存储
@@ -369,20 +390,40 @@ impl LocalIndexer {
         Ok(())
     }
 
-    /// 生成预览 snippet（文件前 N 个字符，带行号）
+    /// 生成预览 snippet（跳过 imports，返回有意义的代码）
     fn generate_preview_snippet(content: &str) -> String {
+        let lines: Vec<&str> = content.lines().collect();
+        
+        // 查找有意义的起始位置（跳过 imports 和注释）
+        let mut start_idx = 0;
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() 
+                && !trimmed.starts_with("use ")
+                && !trimmed.starts_with("import ")
+                && !trimmed.starts_with("//")
+                && !trimmed.starts_with("/*")
+                && !trimmed.starts_with("*")
+                && !trimmed.starts_with("#")
+            {
+                start_idx = i;
+                break;
+            }
+        }
+        
         let mut result = String::new();
         let mut char_count = 0;
         
-        for (i, line) in content.lines().enumerate() {
+        for (i, line) in lines.iter().enumerate().skip(start_idx) {
             if char_count >= MAX_SNIPPET_LENGTH {
                 result.push_str(&format!("  ... (truncated)\n"));
                 break;
             }
             
             let line_num = i + 1;
-            let line_text = if line.len() > 100 {
-                format!("{}...", &line[..100])
+            let line_text = if line.chars().count() > 100 {
+                let truncated: String = line.chars().take(100).collect();
+                format!("{}...", truncated)
             } else {
                 line.to_string()
             };
@@ -398,6 +439,30 @@ impl LocalIndexer {
         self.writer.commit()?;
         Ok(())
     }
+
+    /// 获取索引统计信息
+    pub fn get_stats(&self, root: &Path) -> Result<IndexStats> {
+        let metadata = self.load_metadata();
+        let root_key = root.to_string_lossy().to_string();
+        
+        let project_files = metadata.projects.get(&root_key);
+        let indexed_count = project_files.map(|m| m.len()).unwrap_or(0);
+        
+        Ok(IndexStats {
+            indexed_files: indexed_count,
+            index_path: self.config.index_path.clone(),
+            last_updated: project_files
+                .and_then(|m| m.values().map(|v| v.mtime).max()),
+        })
+    }
+}
+
+/// 索引统计信息
+#[derive(Debug)]
+pub struct IndexStats {
+    pub indexed_files: usize,
+    pub index_path: PathBuf,
+    pub last_updated: Option<u64>,
 }
 
 fn is_ignored(entry: &walkdir::DirEntry) -> bool {
