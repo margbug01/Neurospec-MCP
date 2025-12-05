@@ -54,7 +54,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 // 使用消息提示
-const { showSuccess, showError } = useToast()
+const { success: showSuccess, error: showError } = useToast()
 
 // 响应式状态
 const loading = ref(false)
@@ -172,27 +172,8 @@ async function handleSubmit() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       showSuccess('模拟响应发送成功')
     }
-    else {
-      // 检查是否是 daemon 模式（有 request.id）
-      const isDaemonMode = props.request?.id && props.request.id.length > 0
 
-      if (isDaemonMode) {
-        // Daemon 模式：发送响应到 daemon server
-        const responseStr = JSON.stringify(response)
-        await invoke('handle_mcp_popup_response', {
-          requestId: props.request.id,
-          response: responseStr,
-        })
-        // Daemon 模式不需要退出应用，只需关闭弹窗
-        showSuccess('响应已发送')
-      }
-      else {
-        // 旧模式：发送响应并退出
-        await invoke('send_mcp_response', { response })
-        await invoke('exit_app')
-      }
-    }
-
+    // 统一交给父级事件处理，避免重复发送或提前退出
     emit('response', response)
   }
   catch (error) {
@@ -246,26 +227,8 @@ async function handleContinue() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       showSuccess('继续请求发送成功')
     }
-    else {
-      // 检查是否是 daemon 模式
-      const isDaemonMode = props.request?.id && props.request.id.length > 0
 
-      if (isDaemonMode) {
-        // Daemon 模式
-        const responseStr = JSON.stringify(response)
-        await invoke('handle_mcp_popup_response', {
-          requestId: props.request.id,
-          response: responseStr,
-        })
-        showSuccess('继续请求已发送')
-      }
-      else {
-        // 旧模式
-        await invoke('send_mcp_response', { response })
-        await invoke('exit_app')
-      }
-    }
-
+    // 统一交给父级事件处理，避免重复发送或提前退出
     emit('response', response)
   }
   catch (error) {

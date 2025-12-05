@@ -6,8 +6,17 @@ import type { MemorySuggestion } from './useMemory'
 /**
  * MCP处理组合式函数
  */
+// MCP 请求类型（包含 daemon 模式的 id 字段）
+interface McpRequestData {
+  id?: string
+  message?: string
+  predefined_options?: string[]
+  is_markdown?: boolean
+  [key: string]: unknown
+}
+
 export function useMcpHandler() {
-  const mcpRequest = ref(null)
+  const mcpRequest = ref<McpRequestData | null>(null)
   const showMcpPopup = ref(false)
   
   // 记忆建议相关状态

@@ -54,8 +54,54 @@ export function useAppManager() {
       }
     }
 
-    // 调用原始响应处理
+    // 根据模式分流：daemon 模式直接回传 daemon，避免退出应用
+    const requestId = mcpHandler.mcpRequest.value?.id
+    if (requestId) {
+      try {
+        return await mcpHandler.handleDaemonPopupResponse(requestId, JSON.stringify(response))
+      }
+      catch (error) {
+        console.error('[Daemon MCP] Response failed:', error)
+        // 失败时也要清理弹窗状态，避免卡住
+        mcpHandler.showMcpPopup.value = false
+        mcpHandler.mcpRequest.value = null
+      }
+      return
+    }
+
+    // 旧模式：发送响应并退出应用
     return mcpHandler.handleMcpResponse(response)
+  }
+
+  // 包装 MCP 取消处理，区分 daemon 模式
+  async function handleMcpCancelWithModeCheck() {
+    const requestId = mcpHandler.mcpRequest.value?.id
+    if (requestId) {
+      // daemon 模式：发送取消响应，不退出应用
+      const cancelResponse = {
+        user_input: '用户取消了操作',
+        selected_options: [],
+        images: [],
+        metadata: {
+          timestamp: new Date().toISOString(),
+          request_id: requestId,
+          source: 'popup_cancel',
+        },
+      }
+      try {
+        return await mcpHandler.handleDaemonPopupResponse(requestId, JSON.stringify(cancelResponse))
+      }
+      catch (error) {
+        console.error('[Daemon MCP] Cancel failed:', error)
+        // 失败时也要清理弹窗状态
+        mcpHandler.showMcpPopup.value = false
+        mcpHandler.mcpRequest.value = null
+      }
+      return
+    }
+
+    // 旧模式：发送取消并退出应用
+    return mcpHandler.handleMcpCancel()
   }
 
   // 创建统一的操作对象
@@ -71,7 +117,7 @@ export function useAppManager() {
     // MCP操作
     mcp: {
       handleResponse: handleMcpResponseWithMemoryAnalysis,
-      handleCancel: mcpHandler.handleMcpCancel,
+      handleCancel: handleMcpCancelWithModeCheck,
       handleDaemonResponse: mcpHandler.handleDaemonPopupResponse,
     },
     // 应用操作
