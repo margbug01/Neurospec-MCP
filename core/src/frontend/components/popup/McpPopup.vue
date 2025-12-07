@@ -34,6 +34,7 @@ interface Props {
 
 interface Emits {
   response: [response: any]
+  daemonSuccess: []
   cancel: []
   openMainLayout: []
   openHistory: []
@@ -172,6 +173,32 @@ async function handleSubmit() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       showSuccess('模拟响应发送成功')
     }
+    else {
+      // 检查是否是 daemon 模式（有 request.id）
+      const isDaemonMode = props.request?.id && props.request.id.length > 0
+
+      if (isDaemonMode) {
+        // Daemon 模式：发送响应到 daemon server
+        console.log('[McpPopup] Daemon mode detected, sending response...')
+        const responseStr = JSON.stringify(response)
+        await invoke('handle_mcp_popup_response', {
+          requestId: props.request.id,
+          response: responseStr,
+        })
+        console.log('[McpPopup] Response sent, emitting daemonSuccess')
+        // Daemon 模式不需要退出应用，只需关闭弹窗
+        showSuccess('响应已发送')
+        // Daemon 模式：通知父组件关闭弹窗，不触发旧模式逻辑
+        emit('daemonSuccess')
+        console.log('[McpPopup] daemonSuccess emitted, returning...')
+        return
+      }
+      else {
+        // 旧模式：发送响应并退出
+        await invoke('send_mcp_response', { response })
+        await invoke('exit_app')
+      }
+    }
 
     // 统一交给父级事件处理，避免重复发送或提前退出
     emit('response', response)
@@ -226,6 +253,28 @@ async function handleContinue() {
       // 模拟模式下的延迟
       await new Promise(resolve => setTimeout(resolve, 1000))
       showSuccess('继续请求发送成功')
+    }
+    else {
+      // 检查是否是 daemon 模式
+      const isDaemonMode = props.request?.id && props.request.id.length > 0
+
+      if (isDaemonMode) {
+        // Daemon 模式
+        const responseStr = JSON.stringify(response)
+        await invoke('handle_mcp_popup_response', {
+          requestId: props.request.id,
+          response: responseStr,
+        })
+        showSuccess('继续请求已发送')
+        // Daemon 模式：通知父组件关闭弹窗，不触发旧模式逻辑
+        emit('daemonSuccess')
+        return
+      }
+      else {
+        // 旧模式
+        await invoke('send_mcp_response', { response })
+        await invoke('exit_app')
+      }
     }
 
     // 统一交给父级事件处理，避免重复发送或提前退出

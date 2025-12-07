@@ -21,6 +21,7 @@ use crate::mcp::tools::unified_store::{
 
 /// 项目洞察结果
 #[derive(Debug)]
+#[allow(dead_code)]
 struct ProjectInsight {
     /// 项目名称
     name: String,
@@ -42,6 +43,7 @@ struct ProjectInsight {
 
 /// 模块条目
 #[derive(Debug)]
+#[allow(dead_code)]
 struct ModuleEntry {
     path: String,
     depth: usize,
@@ -60,6 +62,7 @@ struct DependencyEdge {
 
 /// 核心符号
 #[derive(Debug)]
+#[allow(dead_code)]
 struct KeySymbol {
     name: String,
     kind: String,

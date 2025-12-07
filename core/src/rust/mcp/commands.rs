@@ -138,9 +138,10 @@ pub async fn reset_mcp_tools_config(
 // 已移除 Python Web 服务相关函数，完全使用 Rust 实现
 // 如需调试配置，请直接查看本地配置文件
 
-/// 处理来自前端的 popup 响应
+/// 处理来自前端的 popup 响应 (异步版本，配合 tokio::sync::Mutex)
 #[tauri::command]
-pub fn handle_mcp_popup_response(request_id: String, response: String) -> Result<(), String> {
+pub async fn handle_mcp_popup_response(request_id: String, response: String) -> Result<(), String> {
     crate::daemon::handle_popup_response(request_id, response)
+        .await
         .map_err(|e| format!("Failed to handle popup response: {}", e))
 }

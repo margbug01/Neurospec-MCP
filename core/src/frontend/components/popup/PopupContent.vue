@@ -328,10 +328,10 @@ function createCopyButton(preEl: Element) {
         icon.className = 'i-carbon-copy'
         icon.style.cssText = 'width: 16px; height: 16px; display: block;'
       }, 2000)
-      message.showSuccess('代码已复制到剪贴板')
+      message.success('代码已复制到剪贴板')
     }
     catch {
-      message.showError('复制失败')
+      message.error('复制失败')
     }
   })
 
@@ -352,10 +352,10 @@ function setupInlineCodeCopy() {
     codeEl.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(codeEl.textContent || '')
-        message.showSuccess('代码已复制到剪贴板')
+        message.success('代码已复制到剪贴板')
       }
       catch {
-        message.showError('复制失败')
+        message.error('复制失败')
       }
     })
   })
@@ -553,6 +553,11 @@ onUpdated(() => {
   background-color: transparent !important;
   color: #e5e7eb !important;
   padding: 0 !important;
+  font-size: 0.875rem !important;
+  line-height: 1.6 !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
 }
 
 /* hljs 语法高亮颜色覆盖 */
@@ -578,7 +583,7 @@ onUpdated(() => {
 :deep(.hljs-template-variable),
 :deep(.hljs-type),
 :deep(.hljs-addition) {
-  color: #50fa7b !important;
+  color: #a6e3a1 !important;
 }
 
 :deep(.hljs-comment),
@@ -623,7 +628,7 @@ onUpdated(() => {
 }
 
 :deep(.hljs-addition) {
-  color: #50fa7b !important;
+  color: #a6e3a1 !important;
 }
 
 :deep(.hljs-deletion) {

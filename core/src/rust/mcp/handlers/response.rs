@@ -6,34 +6,17 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use crate::mcp::types::{McpResponse, McpResponseContent};
 
-/// 获取临时图片保存目录
+/// 获取图片保存目录
 /// 
-/// 优先保存到工作区内的 .neurospec/temp/images 目录，
-/// 这样 AI 助手可以通过 readFile 访问图片。
-/// 如果无法确定工作区，回退到系统临时目录。
+/// 优先使用当前工作目录下的 .neurospec/temp/images/，
+/// 这样 AI 助手可以直接读取工作区内的图片。
+/// 如果无法获取工作目录，回退到系统临时目录。
 fn get_temp_image_dir() -> PathBuf {
-    // 尝试获取工作区目录（通过 Git 根目录或当前目录）
+    // 优先使用工作区内的目录
     if let Ok(cwd) = std::env::current_dir() {
-        // 向上查找 .git 目录确定项目根
-        let mut current = cwd.as_path();
-        loop {
-            if current.join(".git").exists() {
-                let workspace_temp = current.join(".neurospec").join("temp").join("images");
-                if fs::create_dir_all(&workspace_temp).is_ok() {
-                    return workspace_temp;
-                }
-                break;
-            }
-            match current.parent() {
-                Some(parent) => current = parent,
-                None => break,
-            }
-        }
-        
-        // 没找到 .git，使用当前目录
-        let workspace_temp = cwd.join(".neurospec").join("temp").join("images");
-        if fs::create_dir_all(&workspace_temp).is_ok() {
-            return workspace_temp;
+        let workspace_dir = cwd.join(".neurospec").join("temp").join("images");
+        if fs::create_dir_all(&workspace_dir).is_ok() {
+            return workspace_dir;
         }
     }
     
@@ -194,6 +177,8 @@ pub fn parse_mcp_response(response: &str) -> Result<Vec<Content>, McpError> {
 }
 
 /// 解析新的结构化响应格式
+/// 
+/// 优化：避免在栈上构建超大字符串，使用堆分配和大小限制
 fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpError> {
     let mut result = Vec::new();
     let mut text_parts = Vec::new();
@@ -211,6 +196,7 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
     }
 
     // 3. 处理图片附件
+    // 始终生成 Markdown 内联图片，使用堆分配避免栈溢出
     let mut image_info_parts = Vec::new();
     for (index, image) in response.images.iter().enumerate() {
         // 添加图片到结果中（图片在前）
@@ -229,12 +215,12 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
             format!("{:.1} MB", estimated_size as f64 / (1024.0 * 1024.0))
         };
 
-        // 使用 Markdown 内联 Base64 格式，让 AI 能直接看到图片
-        let markdown_image = format!(
-            "![图片 {}](data:{};base64,{})",
-            index + 1, image.media_type, image.data
-        );
-
+        // 使用堆分配构建 Markdown 内联图片（避免栈溢出）
+        let mut markdown_image = String::with_capacity(base64_len + 100);
+        markdown_image.push_str(&format!("![图片 {}](data:{};base64,", index + 1, image.media_type));
+        markdown_image.push_str(&image.data);
+        markdown_image.push(')');
+        
         let image_info = format!(
             "=== 图片 {} ===\n类型: {}\n大小: {}\n\n{}",
             index + 1, image.media_type, size_str, markdown_image

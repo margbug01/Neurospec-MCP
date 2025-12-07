@@ -119,6 +119,7 @@ export function useAppManager() {
       handleResponse: handleMcpResponseWithMemoryAnalysis,
       handleCancel: handleMcpCancelWithModeCheck,
       handleDaemonResponse: mcpHandler.handleDaemonPopupResponse,
+      closeDaemonPopup: mcpHandler.closeDaemonPopup,
     },
     // 应用操作
     app: {

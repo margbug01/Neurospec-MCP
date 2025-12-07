@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub custom_prompt_config: CustomPromptConfig, // 自定义prompt配置
     #[serde(default = "default_shortcut_config")]
     pub shortcut_config: ShortcutConfig, // 自定义快捷键配置
+    #[serde(default = "default_daemon_config")]
+    pub daemon_config: DaemonConfig, // Daemon 通讯配置
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -164,6 +166,25 @@ pub struct ShortcutKey {
     pub meta: bool, // macOS的Cmd键
 }
 
+// Daemon 通讯配置
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DaemonConfig {
+    /// 弹窗超时时间（秒）
+    #[serde(default = "default_popup_timeout_secs")]
+    pub popup_timeout_secs: u64,
+    
+    /// 是否启用 WebSocket 长连接
+    #[serde(default = "default_enable_websocket")]
+    pub enable_websocket: bool,
+    
+    /// 心跳间隔（秒）
+    #[serde(default = "default_heartbeat_interval_secs")]
+    pub heartbeat_interval_secs: u64,
+    
+    /// HTTP 客户端超时（秒）
+    #[serde(default = "default_http_client_timeout_secs")]
+    pub http_client_timeout_secs: u64,
+}
 
 #[derive(Debug)]
 pub struct AppState {
@@ -182,6 +203,7 @@ impl Default for AppConfig {
             mcp_config: default_mcp_config(),
             custom_prompt_config: default_custom_prompt_config(),
             shortcut_config: default_shortcut_config(),
+            daemon_config: default_daemon_config(),
         }
     }
 }
@@ -609,4 +631,29 @@ pub fn default_shortcuts() -> HashMap<String, ShortcutBinding> {
     shortcuts
 }
 
+// ==================== Daemon 配置默认值函数 ====================
 
+pub fn default_daemon_config() -> DaemonConfig {
+    DaemonConfig {
+        popup_timeout_secs: default_popup_timeout_secs(),
+        enable_websocket: default_enable_websocket(),
+        heartbeat_interval_secs: default_heartbeat_interval_secs(),
+        http_client_timeout_secs: default_http_client_timeout_secs(),
+    }
+}
+
+pub fn default_popup_timeout_secs() -> u64 {
+    crate::constants::mcp::DEFAULT_POPUP_TIMEOUT_SECS
+}
+
+pub fn default_enable_websocket() -> bool {
+    true // 默认启用 WebSocket
+}
+
+pub fn default_heartbeat_interval_secs() -> u64 {
+    crate::constants::mcp::DEFAULT_HEARTBEAT_INTERVAL_SECS
+}
+
+pub fn default_http_client_timeout_secs() -> u64 {
+    crate::constants::mcp::DEFAULT_HTTP_CLIENT_TIMEOUT_SECS
+}

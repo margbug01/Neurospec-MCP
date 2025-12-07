@@ -86,6 +86,7 @@ impl ServerHandler for ZhiServer {
         Ok(ListToolsResult {
             tools,
             next_cursor: None,
+            meta: None,
         })
     }
 

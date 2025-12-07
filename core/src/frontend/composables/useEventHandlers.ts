@@ -7,6 +7,10 @@ export function useEventHandlers(actions: any) {
     // MCP 事件
     onMcpResponse: actions.mcp.handleResponse,
     onMcpCancel: actions.mcp.handleCancel,
+    onDaemonSuccess: () => {
+      console.log('[EventHandlers] onDaemonSuccess triggered')
+      actions.mcp.closeDaemonPopup()
+    },
 
     // 设置事件
     onToggleAlwaysOnTop: actions.settings.toggleAlwaysOnTop,

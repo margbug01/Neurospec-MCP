@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use super::ws_handler::ws_upgrade_handler;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
@@ -48,6 +49,7 @@ pub fn create_router() -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/mcp/execute", post(execute_tool))
+        .route("/ws", get(ws_upgrade_handler))  // WebSocket endpoint
         .with_state(state)
 }
 
@@ -58,6 +60,7 @@ pub fn create_router_with_app(app_handle: AppHandle) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/mcp/execute", post(execute_tool))
+        .route("/ws", get(ws_upgrade_handler))  // WebSocket endpoint
         .with_state(state)
 }
 
@@ -180,4 +183,99 @@ async fn execute_tool(
     };
     
     (StatusCode::OK, Json(result))
+}
+
+/// Process daemon request - shared logic for HTTP and WebSocket handlers
+/// This is the core request processing function, extracted for reuse
+pub async fn process_daemon_request(
+    request: DaemonRequest,
+    state: &Arc<DaemonAppState>,
+) -> DaemonResponse {
+    match request {
+        DaemonRequest::Interact(interact_req) => {
+            // Validate message size
+            if interact_req.message.len() > MAX_MESSAGE_SIZE {
+                return DaemonResponse::error(format!(
+                    "Message size exceeds maximum allowed size of {} bytes",
+                    MAX_MESSAGE_SIZE
+                ));
+            }
+            
+            // Validate options count
+            if interact_req.predefined_options.len() > MAX_OPTIONS {
+                return DaemonResponse::error(format!(
+                    "Number of options ({}) exceeds maximum allowed ({})",
+                    interact_req.predefined_options.len(),
+                    MAX_OPTIONS
+                ));
+            }
+            
+            // Use app handle if available for GUI popup
+            if let Some(app_handle) = &state.app_handle {
+                use crate::mcp::types::PopupRequest;
+                use crate::daemon::show_popup_and_wait;
+                use crate::mcp::handlers::parse_mcp_response;
+                
+                let popup_request = PopupRequest {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    message: interact_req.message,
+                    predefined_options: if interact_req.predefined_options.is_empty() {
+                        None
+                    } else {
+                        Some(interact_req.predefined_options)
+                    },
+                    is_markdown: interact_req.is_markdown,
+                };
+                
+                match show_popup_and_wait(app_handle, &popup_request).await {
+                    Ok(response_str) => {
+                        match parse_mcp_response(&response_str) {
+                            Ok(content) => {
+                                let result = crate::mcp::create_success_result(content);
+                                match serde_json::to_value(&result) {
+                                    Ok(json) => DaemonResponse::success(json),
+                                    Err(e) => DaemonResponse::error(format!("Failed to serialize result: {}", e)),
+                                }
+                            }
+                            Err(e) => DaemonResponse::error(format!("Failed to parse response: {}", e)),
+                        }
+                    }
+                    Err(e) => DaemonResponse::error(format!("Popup failed: {}", e)),
+                }
+            } else {
+                DaemonResponse::error(
+                    "Cannot show popup: Daemon running in headless mode or AppHandle missing."
+                )
+            }
+        }
+        DaemonRequest::Memory(memory_req) => {
+            match MemoryTool::manage_memory(memory_req).await {
+                Ok(result) => {
+                    match serde_json::to_value(&result) {
+                        Ok(json) => DaemonResponse::success(json),
+                        Err(e) => DaemonResponse::error(format!("Failed to serialize result: {}", e)),
+                    }
+                }
+                Err(e) => DaemonResponse::error(format!("Tool execution failed: {}", e)),
+            }
+        }
+        DaemonRequest::Search(search_req) => {
+            match AcemcpTool::search_context(search_req).await {
+                Ok(result) => {
+                    match serde_json::to_value(&result) {
+                        Ok(json) => DaemonResponse::success(json),
+                        Err(e) => DaemonResponse::error(format!("Failed to serialize result: {}", e)),
+                    }
+                }
+                Err(e) => DaemonResponse::error(format!("Tool execution failed: {}", e)),
+            }
+        }
+        DaemonRequest::EnhanceContext(enhance_req) => {
+            let enhanced = enhance_message_with_context(&enhance_req.message);
+            DaemonResponse::success(serde_json::json!({
+                "original": enhance_req.message,
+                "enhanced": enhanced,
+            }))
+        }
+    }
 }

@@ -40,7 +40,7 @@ onUnmounted(() => {
     <AppContent
       :mcp-request="mcpRequest" :show-mcp-popup="showMcpPopup" :app-config="appConfig"
       :is-initializing="isInitializing" @mcp-response="handlers.onMcpResponse" @mcp-cancel="handlers.onMcpCancel"
-      @toggle-always-on-top="handlers.onToggleAlwaysOnTop"
+      @daemon-success="handlers.onDaemonSuccess" @toggle-always-on-top="handlers.onToggleAlwaysOnTop"
       @update-window-size="handlers.onUpdateWindowSize"
       @update-reply-config="handlers.onUpdateReplyConfig" @message-ready="handlers.onMessageReady"
       @config-reloaded="handlers.onConfigReloaded"

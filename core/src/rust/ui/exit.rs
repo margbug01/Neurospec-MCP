@@ -145,6 +145,7 @@ async fn perform_exit(app: AppHandle) -> Result<(), String> {
 /// Tauri命令：强制退出应用（用于程序内部调用）
 #[tauri::command]
 pub async fn force_exit_app(app: AppHandle) -> Result<(), String> {
+    crate::log_important!(warn, "⚠️ force_exit_app called! Application will exit.");
     perform_exit(app).await
 }
 

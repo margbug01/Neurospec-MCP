@@ -465,6 +465,7 @@ pub struct IndexStats {
     pub last_updated: Option<u64>,
 }
 
+#[allow(dead_code)]
 fn is_ignored(entry: &walkdir::DirEntry) -> bool {
     entry
         .file_name()

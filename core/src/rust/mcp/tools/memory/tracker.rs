@@ -16,6 +16,7 @@ use super::types::{CodeChangeMemory, ChangeType};
 /// - 管理记忆衰减
 pub struct ChangeTracker {
     storage: SqliteStorage,
+    #[allow(dead_code)]
     project_path: String,
 }
 

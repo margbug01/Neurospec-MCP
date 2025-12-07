@@ -34,6 +34,24 @@ pub const DEFAULT_CONTINUE_PROMPT: &str = "请按照最佳实践继续";
 /// MCP 请求超时时间 (ms)
 pub const REQUEST_TIMEOUT_MS: u64 = 30000;
 
+// ==================== Daemon 通讯超时配置 ====================
+
+/// 默认弹窗超时时间（秒）- 用户交互等待
+/// 设置为 10 分钟，给用户充足的思考时间
+pub const DEFAULT_POPUP_TIMEOUT_SECS: u64 = 600;
+
+/// 最小弹窗超时（秒）
+pub const MIN_POPUP_TIMEOUT_SECS: u64 = 60;
+
+/// 最大弹窗超时（秒）- 1小时
+pub const MAX_POPUP_TIMEOUT_SECS: u64 = 3600;
+
+/// 默认心跳间隔（秒）
+pub const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+/// HTTP 客户端超时（秒）- 应大于弹窗超时
+pub const DEFAULT_HTTP_CLIENT_TIMEOUT_SECS: u64 = 660;
+
 /// MCP 重试次数
 pub const MAX_RETRY_COUNT: u32 = 3;
 

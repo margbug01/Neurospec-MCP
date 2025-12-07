@@ -6,6 +6,14 @@ use super::types::{DaemonRequest, DaemonResponse};
 use super::server::DEFAULT_DAEMON_PORT;
 use crate::{log_important, log_debug};
 
+/// 获取 HTTP 客户端超时时间（秒）
+fn get_http_client_timeout_secs() -> u64 {
+    match crate::config::load_standalone_config() {
+        Ok(config) => config.daemon_config.http_client_timeout_secs,
+        Err(_) => crate::constants::mcp::DEFAULT_HTTP_CLIENT_TIMEOUT_SECS,
+    }
+}
+
 /// HTTP client for communicating with the daemon server
 pub struct DaemonClient {
     client: Client,
@@ -13,13 +21,16 @@ pub struct DaemonClient {
 }
 
 impl DaemonClient {
-    /// Create a new daemon client
+    /// Create a new daemon client with configurable timeout
     pub fn new(port: Option<u16>) -> Self {
         let port = port.unwrap_or(DEFAULT_DAEMON_PORT);
         let base_url = format!("http://127.0.0.1:{}", port);
         
+        let timeout_secs = get_http_client_timeout_secs();
+        log_debug!("Creating HTTP client with timeout: {} seconds", timeout_secs);
+        
         let client = Client::builder()
-            .timeout(Duration::from_secs(300)) // 5 minutes for user interaction
+            .timeout(Duration::from_secs(timeout_secs))
             .build()
             .expect("Failed to create HTTP client");
         

@@ -31,6 +31,7 @@ interface Props {
 
 interface Emits {
   mcpResponse: [response: any]
+  daemonSuccess: []
   mcpCancel: []
   toggleAlwaysOnTop: []
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
@@ -125,6 +126,7 @@ onUnmounted(() => {
         :request="props.mcpRequest"
         :app-config="props.appConfig"
         @response="$emit('mcpResponse', $event)"
+        @daemon-success="$emit('daemonSuccess')"
         @cancel="$emit('mcpCancel')"
         @open-main-layout="togglePopupSettings"
         @open-history="openHistoryTab"

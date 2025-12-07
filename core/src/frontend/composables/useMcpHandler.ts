@@ -148,6 +148,17 @@ export function useMcpHandler() {
   }
 
   /**
+   * 关闭 Daemon 模式的弹窗
+   * 用于响应已通过 invoke 发送后的清理
+   */
+  function closeDaemonPopup() {
+    console.log('[Daemon MCP] closeDaemonPopup called - closing popup without exit')
+    showMcpPopup.value = false
+    mcpRequest.value = null
+    console.log('[Daemon MCP] Popup closed successfully')
+  }
+
+  /**
    * 收集对话消息用于记忆分析
    */
   function collectMessage(message: string) {
@@ -223,6 +234,7 @@ export function useMcpHandler() {
     setupMcpEventListener,
     setupDaemonPopupListener,
     handleDaemonPopupResponse,
+    closeDaemonPopup,
     // 记忆建议相关
     memorySuggestions,
     showMemorySuggestionModal,

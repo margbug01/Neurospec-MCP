@@ -115,7 +115,11 @@ pub fn init_logger(config: LogConfig) -> Result<(), Box<dyn std::error::Error>> 
 /// 自动检测模式并初始化日志系统
 pub fn auto_init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-    let is_mcp_mode = args.len() >= 3 && args[1] == "--mcp-request";
+    let exe_name = args.get(0).map(|s| s.to_lowercase()).unwrap_or_default();
+    // 检测 MCP 模式：通过命令行参数或可执行文件名
+    let is_mcp_mode = (args.len() >= 3 && args[1] == "--mcp-request") 
+        || exe_name.contains("mcp")
+        || exe_name.contains("neurospec-mcp");
     
     let config = if is_mcp_mode {
         // MCP 模式：输出到文件
@@ -127,9 +131,9 @@ pub fn auto_init_logger() -> Result<(), Box<dyn std::error::Error>> {
             
         LogConfig {
             level: env::var("RUST_LOG")
-                .unwrap_or_else(|_| "warn".to_string())
+                .unwrap_or_else(|_| "info".to_string()) // 改为 info 级别以便调试
                 .parse::<LevelFilter>()
-                .unwrap_or(LevelFilter::Warn),
+                .unwrap_or(LevelFilter::Info),
             file_path: Some(log_file_path),
             is_mcp_mode: true,
         }
