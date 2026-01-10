@@ -6,8 +6,20 @@
 
 [![Release](https://img.shields.io/github/v/release/margbug01/Neurospec-MCP)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
 [![Download](https://img.shields.io/github/downloads/margbug01/Neurospec-MCP/total)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](https://github.com/margbug01/Neurospec-MCP/releases/latest)
 
-**[⬇️ 下载最新版本](https://github.com/margbug01/Neurospec-MCP/releases/latest)**
+## ⬇️ 下载安装
+
+| 平台 | 下载链接 | 说明 |
+|------|----------|------|
+| **Windows** | [NeuroSpec_x64-setup.exe](https://github.com/margbug01/Neurospec-MCP/releases/latest) | NSIS 安装包 |
+| **Windows** | [NeuroSpec_x64.msi](https://github.com/margbug01/Neurospec-MCP/releases/latest) | MSI 安装包 |
+| **macOS (Intel)** | [NeuroSpec_x64.dmg](https://github.com/margbug01/Neurospec-MCP/releases/latest) | Intel 芯片 |
+| **macOS (Apple Silicon)** | [NeuroSpec_aarch64.dmg](https://github.com/margbug01/Neurospec-MCP/releases/latest) | M1/M2/M3 芯片 |
+| **Linux** | [NeuroSpec_amd64.deb](https://github.com/margbug01/Neurospec-MCP/releases/latest) | Debian/Ubuntu |
+| **Linux** | [NeuroSpec.AppImage](https://github.com/margbug01/Neurospec-MCP/releases/latest) | 通用 AppImage |
 
 <p align="center">
   <img src="icon-new.png" alt="NeuroSpec Logo" width="128" height="128">
@@ -39,9 +51,14 @@ NeuroSpec 的解决方案：
 
 ### 系统要求
 
+- **Windows**: Windows 10 或更高版本 (x64)
+- **macOS**: macOS 10.15 (Catalina) 或更高版本 (Intel & Apple Silicon)
+- **Linux**: Ubuntu 22.04 或兼容发行版 (x64)
+
+### 开发环境要求
+
 - **Rust**: 1.70+
-- **Node.js**: 18+ (使用 pnpm)
-- **操作系统**: Windows 10+、macOS 11+、Linux
+- **Node.js**: 20+ (使用 pnpm 10+)
 
 ### 从源码构建
 
@@ -57,9 +74,13 @@ pnpm install
 pnpm tauri build
 ```
 
-构建产物位于 `core/target/release/`：
-- `NeuroSpec.exe` - GUI 主程序
-- `NeuroSpec-MCP.exe` - MCP 服务端
+构建产物位于 `core/target/release/bundle/`：
+
+| 平台 | 产物 |
+|------|------|
+| Windows | `nsis/NeuroSpec_x64-setup.exe`, `msi/NeuroSpec_x64.msi` |
+| macOS | `dmg/NeuroSpec.dmg`, `macos/NeuroSpec.app` |
+| Linux | `deb/neurospec_amd64.deb`, `appimage/NeuroSpec.AppImage` |
 
 ## 🔧 配置 MCP
 

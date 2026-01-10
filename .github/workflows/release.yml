@@ -88,13 +88,11 @@ jobs:
         with:
           name: NeuroSpec-${{ matrix.artifact_name }}
           path: |
-            core/target/${{ matrix.target }}/release/bundle/**/*.exe
-            core/target/${{ matrix.target }}/release/bundle/**/*.msi
-            core/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            core/target/${{ matrix.target }}/release/bundle/**/*.app
-            core/target/${{ matrix.target }}/release/bundle/**/*.deb
-            core/target/${{ matrix.target }}/release/bundle/**/*.AppImage
-            core/target/${{ matrix.target }}/release/bundle/**/*.tar.gz
+            core/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            core/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            core/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            core/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            core/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
           if-no-files-found: ignore
 
   release:
