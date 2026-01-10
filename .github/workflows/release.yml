@@ -51,9 +51,9 @@ jobs:
           node-version: '20'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 10
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -74,20 +74,14 @@ jobs:
         working-directory: core
         run: pnpm install
 
-      - name: Install Tauri CLI
-        working-directory: core
-        run: pnpm add -D @tauri-apps/cli
+      - name: Install Tauri CLI (cargo)
+        run: cargo install tauri-cli --version "^2.0.0" --locked
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        working-directory: core
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: core
-          tauriScript: pnpm tauri
-          args: --target ${{ matrix.target }}
+        run: cargo tauri build --target ${{ matrix.target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
