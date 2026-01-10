@@ -14,30 +14,44 @@ pub fn setup_window_event_listeners(app_handle: &AppHandle) {
                 
                 let app_handle = app_handle_clone.clone();
                 
-                // 异步处理退出请求
-                tauri::async_runtime::spawn(async move {
-                    let state = app_handle.state::<AppState>();
+                // macOS: 关闭窗口时隐藏而非退出 (符合 macOS 惯例)
+                #[cfg(target_os = "macos")]
+                {
+                    log_important!(info, "🍎 macOS: 隐藏窗口到 Dock");
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    return;
+                }
+                
+                // Windows/Linux: 保持现有退出确认逻辑
+                #[cfg(not(target_os = "macos"))]
+                {
+                    // 异步处理退出请求
+                    tauri::async_runtime::spawn(async move {
+                        let state = app_handle.state::<AppState>();
 
-                    log_important!(info, "🖱️ 窗口关闭按钮被点击");
+                        log_important!(info, "🖱️ 窗口关闭按钮被点击");
 
-                    // 窗口关闭按钮点击应该直接退出，不需要双重确认
-                    match crate::ui::exit::handle_system_exit_request(
-                        state,
-                        &app_handle,
-                        true, // 手动点击关闭按钮
-                    ).await {
-                        Ok(exited) => {
-                            if !exited {
-                                log_important!(info, "退出被阻止，等待二次确认");
-                            } else {
-                                log_important!(info, "应用已退出");
+                        // 窗口关闭按钮点击应该直接退出，不需要双重确认
+                        match crate::ui::exit::handle_system_exit_request(
+                            state,
+                            &app_handle,
+                            true, // 手动点击关闭按钮
+                        ).await {
+                            Ok(exited) => {
+                                if !exited {
+                                    log_important!(info, "退出被阻止，等待二次确认");
+                                } else {
+                                    log_important!(info, "应用已退出");
+                                }
+                            }
+                            Err(e) => {
+                                log_important!(error, "处理退出请求失败: {}", e);
                             }
                         }
-                        Err(e) => {
-                            log_important!(error, "处理退出请求失败: {}", e);
-                        }
-                    }
-                });
+                    });
+                }
             }
         });
     }

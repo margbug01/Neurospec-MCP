@@ -1,4 +1,21 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{Mutex, oneshot};
+
+/// Shared state for pending popup responses
+#[derive(Clone)]
+pub struct PendingResponseState {
+    pub map: Arc<Mutex<HashMap<String, oneshot::Sender<String>>>>,
+}
+
+impl Default for PendingResponseState {
+    fn default() -> Self {
+        Self {
+            map: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
 
 /// Generic daemon request wrapper
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,9 +26,6 @@ pub enum DaemonRequest {
     
     #[serde(rename = "memory")]
     Memory(crate::mcp::MemoryRequest),
-    
-    #[serde(rename = "search")]
-    Search(crate::mcp::tools::acemcp::types::SearchRequest),
     
     #[serde(rename = "enhance_context")]
     EnhanceContext(EnhanceContextRequest),

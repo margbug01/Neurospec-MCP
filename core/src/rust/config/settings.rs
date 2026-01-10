@@ -577,6 +577,10 @@ pub fn default_shortcut_config() -> ShortcutConfig {
 pub fn default_shortcuts() -> HashMap<String, ShortcutBinding> {
     let mut shortcuts = HashMap::new();
 
+    // 平台适配：macOS 使用 Cmd，Windows/Linux 使用 Ctrl
+    let use_meta = cfg!(target_os = "macos");
+    let use_ctrl = !use_meta;
+
     // 快速发送快捷键
     shortcuts.insert("quick_submit".to_string(), ShortcutBinding {
         id: "quick_submit".to_string(),
@@ -585,10 +589,10 @@ pub fn default_shortcuts() -> HashMap<String, ShortcutBinding> {
         action: "submit".to_string(),
         key_combination: ShortcutKey {
             key: "Enter".to_string(),
-            ctrl: true,
+            ctrl: use_ctrl,
             alt: false,
             shift: false,
-            meta: false,
+            meta: use_meta,
         },
         enabled: true,
         scope: "popup".to_string(),
@@ -602,16 +606,16 @@ pub fn default_shortcuts() -> HashMap<String, ShortcutBinding> {
         action: "enhance".to_string(),
         key_combination: ShortcutKey {
             key: "Enter".to_string(),
-            ctrl: true,
+            ctrl: use_ctrl,
             alt: false,
             shift: true,
-            meta: false,
+            meta: use_meta,
         },
         enabled: true,
         scope: "popup".to_string(),
     });
 
-    // 继续快捷键
+    // 继续快捷键 (Alt/Option+Enter 在所有平台保持一致)
     shortcuts.insert("continue".to_string(), ShortcutBinding {
         id: "continue".to_string(),
         name: "继续".to_string(),

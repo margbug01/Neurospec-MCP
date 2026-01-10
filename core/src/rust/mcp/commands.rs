@@ -140,8 +140,12 @@ pub async fn reset_mcp_tools_config(
 
 /// 处理来自前端的 popup 响应 (异步版本，配合 tokio::sync::Mutex)
 #[tauri::command]
-pub async fn handle_mcp_popup_response(request_id: String, response: String) -> Result<(), String> {
-    crate::daemon::handle_popup_response(request_id, response)
+pub async fn handle_mcp_popup_response(
+    request_id: String, 
+    response: String, 
+    state: State<'_, crate::daemon::types::PendingResponseState>
+) -> Result<(), String> {
+    crate::daemon::handle_popup_response(&state, request_id, response)
         .await
         .map_err(|e| format!("Failed to handle popup response: {}", e))
 }

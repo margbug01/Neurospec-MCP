@@ -118,6 +118,21 @@ export function useMcpHandler() {
 
         // 注意：响应通过 handleDaemonPopupResponse 发送
       })
+      
+      // 监听取消事件（用于处理后端超时）
+      await listen('mcp-popup-cancel', (event) => {
+        const requestId = event.payload as string
+        console.log('[Daemon MCP] Received popup cancel request:', requestId)
+        
+        // 检查是否是当前正在显示的弹窗
+        if (mcpRequest.value?.id === requestId) {
+           console.log('[Daemon MCP] Auto-closing zombie popup for ID:', requestId)
+           closeDaemonPopup()
+        } else {
+           console.log('[Daemon MCP] Cancel request ignored - ID mismatch:', requestId, mcpRequest.value?.id)
+        }
+      })
+      
       console.log('[Daemon MCP] Popup listener initialized')
     }
     catch (error) {

@@ -19,11 +19,6 @@ pub use global::{
     init_global_watcher,
     watch_project,
     process_file_changes,
-    // 搜索引擎相关
-    init_global_search_config,
-    get_global_search_config,
-    create_searcher_for_project,
-    is_search_initialized,
     // 索引状态管理
     IndexState,
     IndexHealth,

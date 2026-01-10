@@ -36,18 +36,32 @@ fn decode_url_path(path: &str) -> String {
 
 /// 规范化路径格式
 ///
-/// 处理 Windows 下的路径格式问题，如 /c:/ -> C:\
+/// 跨平台路径格式处理：
+/// - Windows: /c:/ -> C:\
+/// - macOS/Linux: file:// URI、波浪号展开等
 fn normalize_path_format(path: &str) -> Result<String> {
     let path = path.trim();
 
-    // 检查是否为 Windows 风格的路径（以 /盘符:/ 开头）
-    if let Some(normalized) = normalize_windows_path(path) {
-        return Ok(normalized);
+    // 平台特定路径规范化
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: 检查是否为 /盘符:/ 格式
+        if let Some(normalized) = normalize_windows_path(path) {
+            return Ok(normalized);
+        }
+
+        // 检查是否为标准的 Windows 路径（C:\ 或 C:/）
+        if is_windows_absolute_path(path) {
+            return Ok(path.replace('/', "\\"));
+        }
     }
 
-    // 检查是否为标准的 Windows 路径（C:\ 或 C:/）
-    if is_windows_absolute_path(path) {
-        return Ok(path.replace('/', "\\"));
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        // macOS/Linux: 处理 file:// URI 和波浪号
+        if let Some(normalized) = normalize_unix_path(path) {
+            return Ok(normalized);
+        }
     }
 
     // 其他情况直接返回
@@ -79,6 +93,43 @@ fn is_windows_absolute_path(path: &str) -> bool {
     re.is_match(path)
 }
 
+/// 规范化 Unix (macOS/Linux) 路径格式
+///
+/// 处理以下情况：
+/// - file:///path/to/file -> /path/to/file
+/// - ~/path -> /Users/username/path (展开波浪号)
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn normalize_unix_path(path: &str) -> Option<String> {
+    // 处理 file:// URI scheme
+    if path.starts_with("file://") {
+        let stripped = path.strip_prefix("file://")?;
+        // macOS 上可能是 file:///path 或 file://localhost/path
+        let normalized = if stripped.starts_with("localhost/") {
+            stripped.strip_prefix("localhost")?.to_string()
+        } else {
+            stripped.to_string()
+        };
+        return Some(normalized);
+    }
+
+    // 处理波浪号展开 (~)
+    if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            let rest = path.strip_prefix("~/")?;
+            return Some(home.join(rest).to_string_lossy().to_string());
+        }
+    }
+
+    // 处理单独的波浪号
+    if path == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return Some(home.to_string_lossy().to_string());
+        }
+    }
+
+    None
+}
+
 /// 验证项目路径是否存在
 pub fn validate_project_path(path: &str) -> Result<()> {
     // 先对路径进行解码和规范化
@@ -102,18 +153,34 @@ pub fn validate_project_path(path: &str) -> Result<()> {
 }
 
 /// 验证路径格式是否合法
+///
+/// 跨平台验证规则：
+/// - Windows: 检查非法字符 (<>"?*|) 和 260 字符限制
+/// - macOS/Linux: 仅检查 NUL 字符
 fn validate_path_format(path: &str) -> Result<()> {
-    // 检查路径是否包含非法字符
-    let illegal_chars = ['<', '>', '"', '|', '?', '*'];
-    for ch in illegal_chars.iter() {
-        if path.contains(*ch) {
-            anyhow::bail!("路径包含非法字符 '{}': {}", ch, path);
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 非法字符检查
+        let illegal_chars = ['<', '>', '"', '|', '?', '*'];
+        for ch in illegal_chars.iter() {
+            if path.contains(*ch) {
+                anyhow::bail!("路径包含非法字符 '{}': {}", ch, path);
+            }
+        }
+
+        // Windows 路径长度限制 (MAX_PATH = 260)
+        if path.len() > 260 {
+            anyhow::bail!("路径过长（超过260字符）: {}", path);
         }
     }
 
-    // 检查路径长度（Windows 限制）
-    if cfg!(windows) && path.len() > 260 {
-        anyhow::bail!("路径过长（超过260字符）: {}", path);
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        // Unix 系统仅 NUL 字符非法
+        if path.contains('\0') {
+            anyhow::bail!("路径包含非法字符 (NUL): {}", path);
+        }
+        // macOS/Linux 路径长度限制通常为 PATH_MAX (4096)，一般无需检查
     }
 
     Ok(())

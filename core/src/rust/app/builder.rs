@@ -3,6 +3,7 @@ use crate::app::{setup::setup_application, commands::*};
 use crate::log_important;
 use tauri::{Builder, Manager};
 
+
 /// 构建Tauri应用
 pub fn build_tauri_app() -> Builder<tauri::Wry> {
     tauri::Builder::default()
@@ -15,7 +16,6 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
                 let _ = window.set_focus();
             }
         }))
-
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             // 基础应用命令
@@ -65,9 +65,9 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             create_test_popup,
             
             // 搜索命令（本地引擎）
-            crate::mcp::tools::acemcp::commands::clear_acemcp_cache,
-            crate::mcp::tools::acemcp::commands::debug_acemcp_search,
-            crate::mcp::tools::acemcp::commands::execute_acemcp_tool,
+            // crate::mcp::tools::acemcp::commands::clear_acemcp_cache,
+            // crate::mcp::tools::acemcp::commands::debug_acemcp_search,
+            // crate::mcp::tools::acemcp::commands::execute_acemcp_tool,
 
             // 上下文编排器命令
             crate::daemon::commands::set_context_orchestrator_config,

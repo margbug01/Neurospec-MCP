@@ -10,7 +10,6 @@ use lazy_static::lazy_static;
 
 use super::store::UnifiedSymbolStore;
 use super::watcher::{FileWatcher, FileChangeEvent};
-use crate::mcp::tools::acemcp::local_engine::{LocalSearcher, LocalEngineConfig};
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -162,9 +161,6 @@ lazy_static! {
     /// 全局文件监听器（使用 Mutex 因为 Receiver 不是 Sync）
     static ref GLOBAL_WATCHER: Arc<std::sync::Mutex<Option<FileWatcher>>> = Arc::new(std::sync::Mutex::new(None));
     
-    /// 全局搜索引擎配置
-    static ref GLOBAL_SEARCH_CONFIG: Arc<RwLock<Option<LocalEngineConfig>>> = Arc::new(RwLock::new(None));
-    
     /// 项目索引状态（项目路径 -> 状态）
     static ref PROJECT_INDEX_STATE: Arc<RwLock<HashMap<String, ProjectIndexState>>> = {
         // 尝试从文件加载持久化状态
@@ -285,47 +281,6 @@ fn find_project_root(path: &std::path::Path) -> Option<PathBuf> {
         
         current = current.parent()?;
     }
-}
-
-// ============================================================================
-// 全局搜索引擎相关
-// ============================================================================
-
-/// 初始化全局搜索配置
-/// 
-/// 应在应用启动时与 init_global_store 一起调用
-pub fn init_global_search_config(index_dir: &std::path::Path) -> Result<()> {
-    let config = LocalEngineConfig {
-        index_path: index_dir.to_path_buf(),
-        max_results: 10,
-        snippet_context: 3,
-    };
-    
-    let mut global = GLOBAL_SEARCH_CONFIG.write().map_err(|e| anyhow::anyhow!("{}", e))?;
-    *global = Some(config);
-    
-    Ok(())
-}
-
-/// 获取全局搜索配置
-pub fn get_global_search_config() -> Result<LocalEngineConfig> {
-    let guard = GLOBAL_SEARCH_CONFIG.read().map_err(|e| anyhow::anyhow!("{}", e))?;
-    guard.clone().ok_or_else(|| anyhow::anyhow!("Global search config not initialized"))
-}
-
-/// 为项目创建 Searcher
-/// 
-/// 使用全局配置创建针对特定项目的 Searcher 实例
-pub fn create_searcher_for_project(project_root: &std::path::Path) -> Result<LocalSearcher> {
-    let config = get_global_search_config()?;
-    LocalSearcher::new(config, project_root.to_path_buf())
-}
-
-/// 检查全局搜索系统是否已初始化
-pub fn is_search_initialized() -> bool {
-    GLOBAL_SEARCH_CONFIG.read()
-        .map(|guard| guard.is_some())
-        .unwrap_or(false)
 }
 
 // ============================================================================
@@ -531,47 +486,14 @@ pub fn is_project_indexed(project_root: &std::path::Path) -> bool {
 
 /// 验证 Tantivy 索引完整性
 fn verify_index_integrity(_project_root: &std::path::Path) -> bool {
-    let config = match get_global_search_config() {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    
-    let index_dir = &config.index_path;
-    
-    // 检查索引目录是否存在
-    if !index_dir.exists() {
-        return false;
-    }
-    
-    // 检查是否有 segment 文件（Tantivy 索引的基本组成）
-    let has_meta = index_dir.join("meta.json").exists();
-    let has_segments = std::fs::read_dir(index_dir)
-        .map(|entries| {
-            entries.filter_map(|e| e.ok())
-                .any(|e| e.file_name().to_string_lossy().ends_with(".managed.json"))
-        })
-        .unwrap_or(false);
-    
-    has_meta || has_segments
+    // Search function disabled
+    false
 }
 
 /// 检查 index_metadata.json 中是否有该项目的记录
-fn check_index_metadata_exists(project_key: &str) -> Option<usize> {
-    let config = get_global_search_config().ok()?;
-    let metadata_path = config.index_path.join("index_metadata.json");
-    
-    if !metadata_path.exists() {
-        return None;
-    }
-    
-    let content = std::fs::read_to_string(&metadata_path).ok()?;
-    let metadata: serde_json::Value = serde_json::from_str(&content).ok()?;
-    
-    // 检查 projects 字段中是否有该项目
-    let projects = metadata.get("projects")?.as_object()?;
-    let project_files = projects.get(project_key)?.as_object()?;
-    
-    Some(project_files.len())
+fn check_index_metadata_exists(_project_key: &str) -> Option<usize> {
+    // Search function disabled
+    None
 }
 
 /// 检查项目是否正在索引中
@@ -659,9 +581,11 @@ pub fn get_index_state(project_root: &std::path::Path) -> Option<ProjectIndexSta
         .and_then(|guard| guard.get(&key).cloned())
 }
 
-/// 获取项目已索引的文件数量
-pub fn get_indexed_file_count(project_root: &std::path::Path) -> Option<usize> {
-    get_index_state(project_root).map(|s| s.file_count)
+/// 获取已索引文件数
+pub fn get_indexed_file_count(project_root: &std::path::Path) -> usize {
+    get_index_state(project_root)
+        .map(|state| state.get_file_count())
+        .unwrap_or(0)
 }
 
 // ============================================================================

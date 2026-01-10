@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::neurospec::services::graph::builder::GraphBuilder;
 use crate::neurospec::services::graph::RelationType;
-use crate::mcp::tools::unified_store::{with_global_store, is_search_initialized};
+use crate::mcp::tools::unified_store::with_global_store;
 
 /// Arguments for neurospec.graph.impact_analysis
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -21,14 +21,14 @@ pub fn handle_impact_analysis(
     args: ImpactAnalysisArgs,
 ) -> Result<Vec<Content>, McpError> {
     // 优先使用全局 Store（增量索引，性能更好）
-    let graph = if is_search_initialized() {
-        with_global_store(|store| {
-            GraphBuilder::build_from_store(&args.project_root, store)
-        })
-        .map_err(|e| McpError::internal_error(format!("Failed to build graph from store: {}", e), None))?
-    } else {
-        // 回退到直接扫描（兼容 MCP 独立运行）
-        GraphBuilder::build_from_project(&args.project_root)
+    let graph = match with_global_store(|store| {
+        GraphBuilder::build_from_store(&args.project_root, store)
+    }) {
+        Ok(g) => g,
+        Err(_) => {
+            // 回退到直接扫描（兼容 MCP 独立运行或 Store 未初始化）
+            GraphBuilder::build_from_project(&args.project_root)
+        }
     };
 
     // Find the node for the symbol

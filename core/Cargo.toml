@@ -78,9 +78,6 @@ rayon = "1.8"
 petgraph = "0.8.3"
 tempfile = "3.23.0"
 walkdir = "2.4"
-zstd = "=0.12.4"
-zstd-safe = "=6.0.6"
-tantivy = { version = "0.21", default-features = false, features = [ "default" ] }
 rusqlite = { version = "0.31", features = [ "bundled" ] }
 base64 = "0.22.1"
 
@@ -96,5 +93,5 @@ experimental-neurospec = []
 opt-level = "z" # 优化体积而非速度
 lto = true # 链接时优化，减少最终二进制大小
 codegen-units = 1 # 减少代码生成单元，提高优化效果
-panic = "abort" # 减少panic处理代码
-strip = true # 移除调试符号
+panic = "unwind" # 允许 panic unwind 以便捕获错误
+strip = false # 保留调试符号以排查问题

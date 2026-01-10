@@ -2,11 +2,11 @@ use anyhow::Result;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use super::routes::{create_router, create_router_with_app};
 use crate::{log_important, log_debug};
-use crate::mcp::tools::{init_global_store, init_global_watcher, init_global_search_config};
+use crate::mcp::tools::{init_global_store, init_global_watcher};
 
 /// Default daemon server port
 pub const DEFAULT_DAEMON_PORT: u16 = 15177;
@@ -24,7 +24,8 @@ pub async fn start_daemon_server_with_app(app_handle: AppHandle, port: Option<u1
     log_important!(info, "Starting daemon HTTP server on {}", addr);
     
     // Create router with app handle for GUI integration
-    let app = create_router_with_app(app_handle)
+    let pending_state = app_handle.state::<crate::daemon::types::PendingResponseState>().inner().clone();
+    let app = create_router_with_app(app_handle, pending_state)
         .layer(CorsLayer::permissive());
     
     // Bind TCP listener
@@ -121,20 +122,12 @@ fn init_unified_store() {
         .join("neurospec");
     
     let store_cache_dir = base_cache_dir.join("unified_store");
-    let index_cache_dir = base_cache_dir.join("search_index");
     
     // 初始化全局存储
     if let Err(e) = init_global_store(&store_cache_dir) {
         log_important!(warn, "Failed to initialize global store: {}", e);
     } else {
         log_important!(info, "Global unified store initialized at {:?}", store_cache_dir);
-    }
-    
-    // 初始化全局搜索配置
-    if let Err(e) = init_global_search_config(&index_cache_dir) {
-        log_important!(warn, "Failed to initialize global search config: {}", e);
-    } else {
-        log_important!(info, "Global search config initialized at {:?}", index_cache_dir);
     }
     
     // 初始化文件监听器

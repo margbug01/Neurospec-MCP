@@ -7,7 +7,7 @@ use crate::neurospec::models::SymbolKind;
 use crate::neurospec::services::graph::builder::GraphBuilder;
 use crate::neurospec::services::refactor::renamer::Renamer;
 use crate::neurospec::services::refactor::validator::Validator;
-use crate::mcp::tools::unified_store::{with_global_store, is_search_initialized};
+use crate::mcp::tools::unified_store::with_global_store;
 
 /// Arguments for neurospec.refactor.rename
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -44,14 +44,14 @@ pub struct SafeEditArgs {
 
 pub fn handle_rename(args: RenameArgs) -> Result<Vec<Content>, McpError> {
     // 优先使用全局 Store（增量索引，性能更好）
-    let graph = if is_search_initialized() {
-        with_global_store(|store| {
-            GraphBuilder::build_from_store(&args.project_root, store)
-        })
-        .map_err(|e| McpError::internal_error(format!("Failed to build graph from store: {}", e), None))?
-    } else {
-        // 回退到直接扫描
-        GraphBuilder::build_from_project(&args.project_root)
+    let graph = match with_global_store(|store| {
+        GraphBuilder::build_from_store(&args.project_root, store)
+    }) {
+        Ok(g) => g,
+        Err(_) => {
+            // 回退到直接扫描
+            GraphBuilder::build_from_project(&args.project_root)
+        }
     };
 
     // Parse symbol kind

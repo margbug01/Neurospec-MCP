@@ -6,8 +6,6 @@ use rmcp::model::Tool;
 use schemars::schema_for;
 
 use crate::mcp::types::{InteractRequest, MemoryRequest};
-use crate::mcp::tools::acemcp::types::SearchRequest;
-use crate::mcp::tools::acemcp::health::HealthRequest;
 
 #[cfg(feature = "experimental-neurospec")]
 use crate::neurospec::tools::{ImpactAnalysisArgs, RenameArgs};
@@ -36,18 +34,6 @@ pub const CORE_TOOLS: &[ToolDefinition] = &[
         name: "memory",
         description: "Global memory management tool for storing and managing development rules, user preferences, and best practices",
         is_core: true,
-        feature: None,
-    },
-    ToolDefinition {
-        name: "search",
-        description: "🔍 PRIORITY TOOL: Always use this FIRST before reading files! Structure-first smart search for relevant code context in a project. Recommended usage: set `profile` to `smart_structure` or `structure_only` and use natural language queries. Low-level `mode` (`text`/`symbol`/`structure`) is kept for backward compatibility.",
-        is_core: false,
-        feature: None,
-    },
-    ToolDefinition {
-        name: "health",
-        description: "Check Neurospec search engine health status, including index state, engine availability, and embedding readiness",
-        is_core: false,
         feature: None,
     },
 ];
@@ -120,14 +106,6 @@ pub fn get_tool_schema(name: &str) -> Option<serde_json::Map<String, serde_json:
         }
         "memory" => {
             let schema = schema_for!(MemoryRequest);
-            root_schema_to_json(schema)
-        }
-        "search" => {
-            let schema = schema_for!(SearchRequest);
-            root_schema_to_json(schema)
-        }
-        "health" => {
-            let schema = schema_for!(HealthRequest);
             root_schema_to_json(schema)
         }
         #[cfg(feature = "experimental-neurospec")]

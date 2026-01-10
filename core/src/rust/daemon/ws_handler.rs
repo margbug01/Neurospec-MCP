@@ -17,6 +17,19 @@ use super::types::{DaemonRequest, DaemonResponse};
 use super::routes::DaemonAppState;
 use crate::{log_important, log_debug};
 
+/// 安全截取字符串预览（避免切到 UTF-8 多字节字符中间导致 panic）
+fn safe_string_preview(s: &str, max_bytes: usize) -> &str {
+    if max_bytes >= s.len() {
+        return s;
+    }
+    // 从 max_bytes 向前找到最近的有效字符边界
+    let mut boundary = max_bytes;
+    while boundary > 0 && !s.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    &s[..boundary]
+}
+
 /// WebSocket 消息格式
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -94,7 +107,7 @@ async fn handle_ws_connection(socket: WebSocket, state: Arc<DaemonAppState>) {
             msg = receiver.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        log_debug!("[WebSocket] Received: {}", &text[..text.len().min(200)]);
+                        log_debug!("[WebSocket] Received: {}", safe_string_preview(&text, 200));
                         
                         match serde_json::from_str::<WsMessage>(&text) {
                             Ok(ws_msg) => {
@@ -168,7 +181,7 @@ async fn handle_ws_connection(socket: WebSocket, state: Arc<DaemonAppState>) {
             Some(resp_text) = resp_rx.recv() => {
                 log_important!(info, "[WebSocket][Conn#{}] Received async response from channel, length={}", conn_id, resp_text.len());
                 // 打印响应预览以便调试
-                let preview = if resp_text.len() > 200 { &resp_text[..200] } else { &resp_text };
+                let preview = safe_string_preview(&resp_text, 200);
                 log_important!(info, "[WebSocket][Conn#{}] Response preview: {}", conn_id, preview);
                 
                 match sender.send(Message::Text(resp_text.clone())).await {

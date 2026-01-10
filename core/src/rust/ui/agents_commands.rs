@@ -156,7 +156,7 @@ pub async fn detect_project_agents() -> Result<DetectProjectResponse, String> {
 /// 获取索引状态
 #[tauri::command]
 pub async fn get_index_status() -> Result<IndexStatusResponse, String> {
-    use crate::mcp::tools::unified_store::{is_search_initialized, is_project_indexed, is_project_indexing, get_indexed_file_count};
+    use crate::mcp::tools::unified_store::{is_project_indexed, is_project_indexing, get_indexed_file_count};
     
     // 获取当前项目路径
     let project_path = {
@@ -167,18 +167,16 @@ pub async fn get_index_status() -> Result<IndexStatusResponse, String> {
     if let Some(ref path) = project_path {
         let path_buf = PathBuf::from(path);
         
-        if is_search_initialized() {
-            let ready = is_project_indexed(&path_buf);
-            let building = is_project_indexing(&path_buf);
-            let file_count = get_indexed_file_count(&path_buf).unwrap_or(0);
-            
-            return Ok(IndexStatusResponse {
-                ready,
-                file_count,
-                building,
-                project_path: Some(path.clone()),
-            });
-        }
+        let ready = is_project_indexed(&path_buf);
+        let building = is_project_indexing(&path_buf);
+        let file_count = get_indexed_file_count(&path_buf);
+        
+        return Ok(IndexStatusResponse {
+            ready,
+            file_count,
+            building,
+            project_path: Some(path.clone()),
+        });
     }
     
     Ok(IndexStatusResponse {

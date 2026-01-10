@@ -356,12 +356,152 @@ async fn install_macos_update(file_path: &PathBuf) -> Result<(), String> {
         log::info!("📦 处理 tar.gz 压缩包文件");
         install_from_archive(file_path).await
     } else if file_name.ends_with(".dmg") {
-        // DMG 文件需要挂载后复制
+        // DMG 文件自动安装
         log::info!("📦 处理 DMG 文件");
-        return Err("DMG 文件需要手动安装，请手动下载最新版本".to_string());
+        install_from_dmg(file_path).await
     } else {
         return Err("未知的文件格式，请手动下载最新版本".to_string());
     }
+}
+
+/// macOS: 从 DMG 文件安装应用
+#[cfg(target_os = "macos")]
+async fn install_from_dmg(dmg_path: &PathBuf) -> Result<(), String> {
+    log::info!("🍎 开始 DMG 自动安装: {}", dmg_path.display());
+
+    // 1. 挂载 DMG
+    let mount_output = Command::new("hdiutil")
+        .args(&["attach", dmg_path.to_str().unwrap(), "-nobrowse", "-quiet"])
+        .output()
+        .map_err(|e| format!("挂载 DMG 失败: {}", e))?;
+
+    if !mount_output.status.success() {
+        return Err(format!("挂载 DMG 失败: {}", String::from_utf8_lossy(&mount_output.stderr)));
+    }
+
+    log::info!("✅ DMG 已挂载");
+
+    // 2. 查找挂载点 (通常是 /Volumes/AppName)
+    let mount_point = find_dmg_mount_point(dmg_path)?;
+    log::info!("📂 挂载点: {}", mount_point.display());
+
+    // 3. 查找 .app 文件
+    let app_path = find_app_in_volume(&mount_point)?;
+    log::info!("📦 找到应用: {}", app_path.display());
+
+    // 4. 复制到 /Applications
+    let dest_path = PathBuf::from("/Applications").join(app_path.file_name().unwrap());
+    
+    // 如果目标已存在，先删除
+    if dest_path.exists() {
+        log::info!("🗑️ 删除旧版本: {}", dest_path.display());
+        if let Err(e) = fs::remove_dir_all(&dest_path) {
+            // 尝试卸载 DMG 后返回错误
+            let _ = unmount_dmg(&mount_point);
+            return Err(format!("删除旧版本失败 (可能需要管理员权限): {}", e));
+        }
+    }
+
+    // 复制新版本
+    log::info!("📋 复制应用到 /Applications");
+    let copy_output = Command::new("cp")
+        .args(&["-R", app_path.to_str().unwrap(), dest_path.to_str().unwrap()])
+        .output()
+        .map_err(|e| {
+            let _ = unmount_dmg(&mount_point);
+            format!("复制应用失败: {}", e)
+        })?;
+
+    if !copy_output.status.success() {
+        let _ = unmount_dmg(&mount_point);
+        return Err(format!("复制应用失败 (可能需要管理员权限): {}", 
+            String::from_utf8_lossy(&copy_output.stderr)));
+    }
+
+    // 5. 卸载 DMG
+    unmount_dmg(&mount_point)?;
+
+    log::info!("✅ DMG 安装完成！应用已安装到: {}", dest_path.display());
+    Ok(())
+}
+
+/// 非 macOS 平台的占位实现
+#[cfg(not(target_os = "macos"))]
+async fn install_from_dmg(_dmg_path: &PathBuf) -> Result<(), String> {
+    Err("DMG 安装仅支持 macOS 平台".to_string())
+}
+
+/// 查找 DMG 挂载点
+#[cfg(target_os = "macos")]
+fn find_dmg_mount_point(dmg_path: &PathBuf) -> Result<PathBuf, String> {
+    // 从 DMG 文件名推断挂载点名称
+    let dmg_name = dmg_path.file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("NeuroSpec");
+    
+    // 尝试常见的挂载点名称
+    let possible_names = vec![
+        dmg_name.to_string(),
+        "NeuroSpec".to_string(),
+        dmg_name.replace("-", " "),
+        dmg_name.split('-').next().unwrap_or(dmg_name).to_string(),
+    ];
+
+    for name in possible_names {
+        let mount_point = PathBuf::from("/Volumes").join(&name);
+        if mount_point.exists() {
+            return Ok(mount_point);
+        }
+    }
+
+    // 如果找不到，列出 /Volumes 目录查找
+    if let Ok(entries) = fs::read_dir("/Volumes") {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                // 检查是否包含 .app 文件
+                if find_app_in_volume(&path).is_ok() {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+
+    Err("无法找到 DMG 挂载点".to_string())
+}
+
+/// 在挂载卷中查找 .app 文件
+#[cfg(target_os = "macos")]
+fn find_app_in_volume(volume_path: &PathBuf) -> Result<PathBuf, String> {
+    if let Ok(entries) = fs::read_dir(volume_path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if let Some(ext) = path.extension() {
+                if ext == "app" {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+    Err(format!("在 {} 中未找到 .app 文件", volume_path.display()))
+}
+
+/// 卸载 DMG
+#[cfg(target_os = "macos")]
+fn unmount_dmg(mount_point: &PathBuf) -> Result<(), String> {
+    log::info!("📤 卸载 DMG: {}", mount_point.display());
+    
+    let output = Command::new("hdiutil")
+        .args(&["detach", mount_point.to_str().unwrap(), "-quiet"])
+        .output()
+        .map_err(|e| format!("卸载 DMG 失败: {}", e))?;
+
+    if !output.status.success() {
+        log::warn!("⚠️ 卸载 DMG 失败: {}", String::from_utf8_lossy(&output.stderr));
+        // 不返回错误，因为安装已经成功
+    }
+
+    Ok(())
 }
 
 /// Windows 安装逻辑

@@ -56,7 +56,7 @@ impl ServerHandler for ZhiServer {
                 "NeuroSpec-MCP".to_string(),
                 env!("CARGO_PKG_VERSION").to_string(),
             ),
-            instructions: Some("NeuroSpec - AI-powered development assistant.\n\nIMPORTANT WORKFLOW RULE: You MUST use the `search` tool with `mode='symbol'` or `mode='text'` to locate relevant code BEFORE using any modification tools or asking the user for decisions. Do not rely on memory or assumptions. Always ground your actions in the codebase reality.".to_string()),
+            instructions: Some("NeuroSpec - AI-powered development assistant.\n\nUse the `interact` tool to communicate with the user. Use `memory` to store and retrieve project context.".to_string()),
         }
     }
 
